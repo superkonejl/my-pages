@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>推拿客档与部位记账</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    body {
+      background-color: #000000;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, sans-serif;
+      padding: 14px;
+      padding-bottom: 90px;
+      line-height: 1.4;
+    }
+
+    /* 顶部栏 */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #1e2436;
+    }
+    .app-title { font-size: 20px; font-weight: 900; letter-spacing: 0.5px; }
+    .sync-status {
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: #111524;
+      border: 1px solid #232c45;
+    }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #10b981; }
+    .status-dot.syncing { background: #f59e0b; animation: pulse 1s infinite; }
+    .status-dot.error { background: #ef4444; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* 搜索栏与过滤 */
+    .search-section { margin-top: 14px; }
+    .search-input {
+      width: 100%;
+      background: #111524;
+      border: 2px solid #26314f;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffffff;
+      outline: none;
+    }
+    .search-input:focus { border-color: #10b981; }
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .filter-pill {
+      background: #111524;
+      border: 1px solid #232c45;
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 8px 16px;
+      border-radius: 20px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .filter-pill.active { background: #ffffff; color: #000000; border-color: #ffffff; }
+
+    /* 登记大按钮 */
+    .add-main-btn {
+      width: 100%;
+      margin-top: 14px;
+      background: #10b981;
+      color: #000000;
+      font-size: 17px;
+      font-weight: 900;
+      padding: 15px;
+      border-radius: 14px;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);
+    }
+    .add-main-btn:active { transform: scale(0.98); }
+
+    /* 患者卡片列表 */
+    .patient-list { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .card {
+      background: #101422;
+      border: 1px solid #212940;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .card.expanded { border-color: #3b82f6; }
+    .card-header {
+      padding: 16px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .patient-name-box { display: flex; flex-direction: column; gap: 4px; }
+    .patient-name { font-size: 19px; font-weight: 900; color: #ffffff; }
+    .patient-phone { font-size: 14px; color: #94a3b8; font-family: monospace; font-weight: 700; }
+    .badge {
+      font-size: 14px;
+      font-weight: 900;
+      padding: 6px 12px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .badge-debt { background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid #ef4444; }
+    .badge-credit { background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid #10b981; }
+    .badge-zero { background: #1c2236; color: #94a3b8; border: 1px solid #2c3756; }
+
+    .card-summary-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 16px 14px 16px;
+    }
+    .sum-tag {
+      background: #161b2d;
+      color: #94a3b8;
+      border: 1px solid #273250;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+    }
+
+    /* 展开卡片详情 */
+    .card-body {
+      padding: 16px;
+      background: #090c14;
+      border-top: 1px solid #1c2338;
+      display: none;
+    }
+    .card.expanded .card-body { display: block; }
+    .detail-row { margin-bottom: 14px; }
+    .detail-label { font-size: 13px; font-weight: 800; color: #64748b; margin-bottom: 6px; }
+    .detail-val { font-size: 15px; color: #f1f5f9; line-height: 1.5; font-weight: 600; }
+
+    /* 账目明细 */
+    .ledger-box {
+      margin-top: 14px;
+      background: #111524;
+      border: 1px solid #232c45;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .ledger-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 900;
+      color: #94a3b8;
+      margin-bottom: 10px;
+    }
+    .ledger-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      padding: 10px 0;
+      border-bottom: 1px dashed #20273c;
+    }
+    .ledger-item:last-child { border-bottom: none; }
+    .ledger-date { color: #64748b; font-size: 11px; margin-top: 2px; }
+
+    .card-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .btn-act {
+      flex: 1;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 900;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-record { background: #3b82f6; color: #ffffff; }
+    .btn-edit { background: #222a42; color: #cbd5e1; }
+    .btn-del { background: transparent; color: #64748b; border: 1px solid #222a42; flex: 0 0 55px; }
+
+    /* 模态框通用 */
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(5px);
+      display: none;
+      z-index: 999;
+      justify-content: center;
+      align-items: flex-end;
+    }
+    .modal.show { display: flex; }
+    .modal-sheet {
+      background: #0f121e;
+      border-top: 2px solid #2a3554;
+      border-radius: 22px 22px 0 0;
+      width: 100%;
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 22px 18px;
+    }
+    .modal-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+    .modal-title { font-size: 21px; font-weight: 900; }
+    .modal-close-icon {
+      background: #1a2034;
+      border: none;
+      color: #94a3b8;
+      font-size: 18px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* 表单大字体样式 */
+    .form-group { margin-bottom: 16px; }
+    .form-label { font-size: 15px; font-weight: 800; color: #cbd5e1; margin-bottom: 8px; display: block; }
+    .form-input {
+      width: 100%;
+      background: #171c2c;
+      border: 1px solid #2d3856;
+      border-radius: 12px;
+      padding: 13px 16px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      outline: none;
+    }
+    .form-input:focus { border-color: #3b82f6; }
+    .form-textarea { height: 75px; resize: none; }
+
+    /* 折叠面板开关按钮 */
+    .drawer-trigger-btn {
+      width: 100%;
+      background: #171c2c;
+      border: 2px dashed #2f3b5e;
+      border-radius: 14px;
+      padding: 15px;
+      color: #38bdf8;
+      font-size: 16px;
+      font-weight: 900;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .drawer-trigger-btn:active { background: #1c2438; }
+
+    /* 已选标签紧凑回显盒 */
+    .selected-tags-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 40px;
+      padding: 10px;
+      background: #121624;
+      border-radius: 12px;
+      border: 1px solid #232c45;
+    }
+    .selected-capsule {
+      background: #10b981;
+      color: #000000;
+      font-size: 14px;
+      font-weight: 900;
+      padding: 6px 12px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .selected-capsule-del { font-size: 16px; font-weight: 900; cursor: pointer; }
+
+    /* 标签选择抽屉内组件 */
+    .tag-category-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: #94a3b8;
+      margin: 16px 0 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .picker-capsule {
+      background: #181d2f;
+      border: 1.5px solid #2c3756;
+      color: #cbd5e1;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 8px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .picker-capsule.active {
+      background: #10b981;
+      color: #000000;
+      border-color: #10b981;
+    }
+    .picker-capsule.delete-mode {
+      border-color: #ef4444;
+      color: #fca5a5;
+    }
+    .capsule-remove-btn {
+      color: #ef4444;
+      font-weight: 900;
+      font-size: 14px;
+      margin-left: 2px;
+    }
+
+    /* 新增标签快捷栏 */
+    .add-tag-bar {
+      display: flex;
+      gap: 8px;
+      background: #171c2c;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #2d3856;
+      margin-bottom: 12px;
+    }
+    .tag-select-cat {
+      background: #101422;
+      color: #38bdf8;
+      border: 1px solid #2c3756;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      outline: none;
+    }
+    .add-tag-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      outline: none;
+    }
+    .add-tag-btn {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      font-size: 14px;
+      font-weight: 900;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    /* 计数器大号交互 */
+    .counter-row { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+    .counter-btn {
+      width: 52px; height: 52px;
+      background: #1c2338;
+      color: #ffffff;
+      font-size: 26px;
+      font-weight: 900;
+      border: 1px solid #2e3b5e;
+      border-radius: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .counter-val { font-size: 30px; font-weight: 900; font-family: monospace; min-width: 60px; text-align: center; }
+
+    /* 弹窗底部操作按钮 */
+    .modal-footer {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      padding-bottom: 10px;
+    }
+    .btn-submit {
+      flex: 2;
+      background: #10b981;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 900;
+      padding: 15px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-cancel {
+      flex: 1;
+      background: #212940;
+      color: #cbd5e1;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 15px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部状态 -->
+  <header class="top-bar">
+    <div class="app-title">推拿客档 · 部位记账</div>
+    <div class="sync-status" id="syncStatus">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">正在连接 VPS...</span>
+    </div>
+  </header>
+
+  <!-- 顶部全方位搜索 -->
+  <section class="search-section">
+    <input type="text" id="searchInput" class="search-input" placeholder="🔍 全方位搜姓名 / 手机 / 痛点 / 体态...">
+    <div class="filter-pills">
+      <button class="filter-pill active" data-filter="all">全部档案</button>
+      <button class="filter-pill" data-filter="debt">🔴 欠我部位 (挂账)</button>
+      <button class="filter-pill" data-filter="credit">🟢 预存剩余 (我欠)</button>
+      <button class="filter-pill" data-filter="zero">⚪ 账目结清</button>
+    </div>
+  </section>
+
+  <!-- 登记新患者主按钮 -->
+  <button class="add-main-btn" id="openAddModalBtn">
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    <span>登记新患者档案</span>
+  </button>
+
+  <!-- 档案列表 -->
+  <main class="patient-list" id="patientList">
+    <div style="text-align:center; padding:40px; color:#64748b; font-size:15px;">正在同步患者数据...</div>
+  </main>
+
+  <!-- 模态框 1：患者档案主表单 (简洁高对比度，多选项折叠) -->
+  <div class="modal" id="patientModal">
+    <div class="modal-sheet">
+      <div class="modal-header-row">
+        <div class="modal-title" id="patientModalTitle">登记患者档案</div>
+        <button class="modal-close-icon" id="closePatientModal">✕</button>
+      </div>
+      
+      <div class="form-group">
+        <label class="form-label">患者姓名 / 称呼 *</label>
+        <input type="text" id="pName" class="form-input" placeholder="例如：张建国 / 3号熟客">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">手机号码 (选填)</label>
+        <input type="tel" id="pPhone" class="form-input" placeholder="输入手机号或尾号">
+      </div>
+
+      <!-- 折叠抽屉触发器：点击唤起超长标签选择池 -->
+      <div class="form-group">
+        <label class="form-label">体貌特征 / 痛点 / 体态标签</label>
+        <button type="button" class="drawer-trigger-btn" id="openTagPickerBtn">
+          <span id="triggerBtnText">🏷️ 点击展开选择特征标签 (已选 0 个)</span>
+          <span>➔</span>
+        </button>
+        <!-- 已选标签实时回显展示，点击可快速移除 -->
+        <div class="selected-tags-box" id="selectedTagsDisplay">
+          <span style="color:#64748b; font-size:13px; align-self:center;">暂未选择任何特征标签</span>
+        </div>
+      </div>
+
+      <!-- 独立可折叠备注 -->
+      <div class="form-group">
+        <label class="form-label">特别禁忌 / 备忘说明 (选填)</label>
+        <textarea id="pNote" class="form-input form-textarea" placeholder="例如：腰部做过微创，禁大手法扳法；有心脏支架等..."></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelPatientBtn">取消</button>
+        <button class="btn-submit" id="savePatientBtn">保存档案并同步 VPS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态框 2：全屏/深度标签选择与管理库 (支持动态增删) -->
+  <div class="modal" id="tagPickerModal" style="z-index: 1001;">
+    <div class="modal-sheet" style="max-height: 94vh;">
+      <div class="modal-header-row">
+        <div>
+          <div class="modal-title">特征与体态标签库</div>
+          <div style="font-size:12px; color:#94a3b8; margin-top:2px;">点击即可多选，支持随时增加或删除</div>
+        </div>
+        <button class="btn-submit" id="confirmTagsBtn" style="padding: 8px 18px; font-size: 14px; flex:none;">完成选择 ✓</button>
+      </div>
+
+      <!-- 动态添加新标签栏 -->
+      <div class="add-tag-bar">
+        <select id="newTagCategory" class="tag-select-cat">
+          <option value="体态问题">体态问题</option>
+          <option value="常见痛点">常见痛点</option>
+          <option value="受力偏好">受力偏好</option>
+          <option value="体型特征">体型特征</option>
+          <option value="职业特征">职业特征</option>
+          <option value="自定义">自定义</option>
+        </select>
+        <input type="text" id="newTagInput" class="add-tag-input" placeholder="输入新标签名...">
+        <button class="add-tag-btn" id="addNewTagBtn">+ 添加</button>
+      </div>
+
+      <!-- 标签编辑/删除切换开关 -->
+      <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+        <button id="toggleDeleteModeBtn" style="background:transparent; border:1px solid #3b82f6; color:#38bdf8; font-size:13px; font-weight:800; padding:4px 12px; border-radius:20px;">
+          ⚙️ 开启标签删除模式
+        </button>
+      </div>
+
+      <!-- 动态分类展示区域 -->
+      <div id="tagCategoriesContainer"></div>
+    </div>
+  </div>
+
+  <!-- 模态框 3：记账本 (大字号、部位加减计数器) -->
+  <div class="modal" id="ledgerModal">
+    <div class="modal-sheet">
+      <div class="modal-header-row">
+        <div class="modal-title">记一笔部位往来</div>
+        <button class="modal-close-icon" id="closeLedgerModal">✕</button>
+      </div>
+      <p id="ledgerTargetName" style="font-size: 15px; color: #38bdf8; font-weight:800; margin-bottom: 16px;"></p>
+
+      <div class="form-group">
+        <label class="form-label">往来类型</label>
+        <div style="display:flex; gap:8px;">
+          <button class="picker-capsule active" data-type="debt" id="typeDebtBtn" style="flex:1; justify-content:center; padding:12px 0;">🔴 欠我 (挂账)</button>
+          <button class="picker-capsule" data-type="credit" id="typeCreditBtn" style="flex:1; justify-content:center; padding:12px 0;">🟢 我欠 (预存)</button>
+          <button class="picker-capsule" data-type="settle" id="typeSettleBtn" style="flex:1; justify-content:center; padding:12px 0;">⚪ 还账结清</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">部位数量 (个)</label>
+        <div class="counter-row">
+          <button class="counter-btn" id="minusPartBtn">-</button>
+          <div class="counter-val" id="partCountDisplay">1</div>
+          <button class="counter-btn" id="plusPartBtn">+</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">涉及部位 (可多选)</label>
+        <div class="tag-grid" id="areaSelector">
+          <span class="picker-capsule active">颈椎</span>
+          <span class="picker-capsule">肩周</span>
+          <span class="picker-capsule">腰部</span>
+          <span class="picker-capsule">背部</span>
+          <span class="picker-capsule">骨盆/臀</span>
+          <span class="picker-capsule">下肢/膝</span>
+          <span class="picker-capsule">全身调理</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">说明备忘 (选填)</label>
+        <input type="text" id="ledgerRemark" class="form-input" placeholder="例如：下次做完一起付 / 充卡扣减">
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelLedgerBtn">取消</button>
+        <button class="btn-submit" id="saveLedgerBtn">确认入账并保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // VPS 专属 PocketBase 接口配置
+    const API_BASE = 'https://107.173.155.165.sslip.io';
+    const SYNC_TAG = 'TUINA_APP_DATA_V2';
+    let cloudRecordId = null;
+
+    // 默认标签库 (如用户添加或删除，会自动同步存入 VPS)
+    const DEFAULT_TAG_LIBRARY = {
+      '体态问题': ['圆肩驼背', '高低肩', '骨盆前倾', '颈椎前引', '脊柱侧弯', '骨盆旋转'],
+      '常见痛点': ['颈椎僵硬', '落枕', '肩周炎', '腰肌劳损', '腰突', '坐骨神经', '膝关节痛', '腕腱鞘炎', '网球肘'],
+      '受力偏好': ['非常吃劲(大手法)', '力度适中', '怕疼敏感(轻柔)'],
+      '体型特征': ['微胖', '匀称', '消瘦', '魁梧高大', '偏矮'],
+      '职业特征': ['程序员', '职业司机', '教师', '久坐办公', '重体力', '老熟客'],
+      '自定义': ['熟人介绍', '近期熬夜', '喜欢拉伸']
+    };
+
+    // 全局数据模型
+    let tagLibrary = JSON.parse(JSON.stringify(DEFAULT_TAG_LIBRARY));
+    let patients = [];
+    let currentSelectedTags = [];
+    let isTagDeleteMode = false;
+
+    let currentFilter = 'all';
+    let editingPatientId = null;
+    let targetLedgerPatientId = null;
+    let currentPartCount = 1;
+    let currentLedgerType = 'debt';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadLocalData();
+      initEvents();
+      syncFromVPS();
+    });
+
+    // 1. 本地存储快速启动
+    function loadLocalData() {
+      const local = localStorage.getItem('tuina_data_v2');
+      if (local) {
+        try {
+          const parsed = JSON.parse(local);
+          if (parsed.patients) patients = parsed.patients;
+          if (parsed.tagLibrary) tagLibrary = parsed.tagLibrary;
+          renderList();
+        } catch (e) {}
+      }
+    }
+
+    function saveAll() {
+      const payloadObj = { patients, tagLibrary };
+      localStorage.setItem('tuina_data_v2', JSON.stringify(payloadObj));
+      renderList();
+      syncToVPS();
+    }
+
+    // 2. VPS PocketBase 实时自动双向同步
+    async function syncFromVPS() {
+      updateStatus('syncing', '同步云端...');
+      try {
+        const res = await fetch(`${API_BASE}/api/collections/notes/records?sort=-created&perPage=30`);
+        if (!res.ok) throw new Error('网络请求异常');
+        const data = await res.json();
+        const record = data.items.find(item => item.textcontent && item.textcontent.startsWith(SYNC_TAG));
+        
+        if (record) {
+          cloudRecordId = record.id;
+          const jsonStr = record.textcontent.replace(SYNC_TAG, '');
+          const cloudData = JSON.parse(jsonStr);
+          if (cloudData.patients) patients = cloudData.patients;
+          if (cloudData.tagLibrary) tagLibrary = cloudData.tagLibrary;
+          localStorage.setItem('tuina_data_v2', JSON.stringify(cloudData));
+          renderList();
+        }
+        updateStatus('ok', 'VPS 云端已同步');
+      } catch (err) {
+        updateStatus('error', '离线模式(本地已保存)');
+      }
+    }
+
+    async function syncToVPS() {
+      updateStatus('syncing', '上传 VPS...');
+      const payload = { textcontent: SYNC_TAG + JSON.stringify({ patients, tagLibrary }) };
+      try {
+        if (cloudRecordId) {
+          await fetch(`${API_BASE}/api/collections/notes/records/${cloudRecordId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          const res = await fetch(`${API_BASE}/api/collections/notes/records`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (data && data.id) cloudRecordId = data.id;
+        }
+        updateStatus('ok', 'VPS 云端已同步');
+      } catch (e) {
+        updateStatus('error', '待网络恢复上传');
+      }
+    }
+
+    function updateStatus(state, text) {
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      dot.className = 'status-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+      txt.innerText = text;
+    }
+
+    // 3. 渲染主页患者卡片列表
+    function renderList() {
+      const listEl = document.getElementById('patientList');
+      const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      let filtered = patients.filter(p => {
+        const net = calcNetBalance(p.ledger || []);
+        if (currentFilter === 'debt' && net <= 0) return false;
+        if (currentFilter === 'credit' && net >= 0) return false;
+        if (currentFilter === 'zero' && net !== 0) return false;
+
+        if (!keyword) return true;
+        const allContent = [
+          p.name, p.phone, p.note,
+          ...(p.tags || []),
+          ...(p.ledger || []).map(l => l.remark + l.areas.join(''))
+        ].join(' ').toLowerCase();
+
+        return allContent.includes(keyword);
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b; font-size:15px;">${keyword ? '未找到符合条件的患者' : '暂无档案，点击上方按钮新增'}</div>`;
+        return;
+      }
+
+      listEl.innerHTML = '';
+      filtered.forEach(p => {
+        const net = calcNetBalance(p.ledger || []);
+        let badgeHtml = '';
+        if (net > 0) {
+          badgeHtml = `<div class="badge badge-debt">🔴 欠我 ${net} 部位</div>`;
+        } else if (net < 0) {
+          badgeHtml = `<div class="badge badge-credit">🟢 剩余 ${Math.abs(net)} 部位</div>`;
+        } else {
+          badgeHtml = `<div class="badge badge-zero">⚪ 账目结清</div>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = `patient-card-${p.id}`;
+
+        const summaryTagsHtml = (p.tags || []).slice(0, 5).map(t => `<span class="sum-tag">${escapeHtml(t)}</span>`).join('');
+
+        const ledgerItemsHtml = (p.ledger && p.ledger.length > 0)
+          ? p.ledger.map(item => `
+              <div class="ledger-item">
+                <div>
+                  <span style="font-weight:800; color:${item.type === 'debt' ? '#f87171' : item.type === 'credit' ? '#34d399' : '#94a3b8'}">
+                    ${item.type === 'debt' ? '挂账欠我(+)' : item.type === 'credit' ? '次卡预存(-)' : '还账核销'} ${item.parts}部位
+                  </span>
+                  <span style="color:#64748b; margin-left:6px; font-weight:700;">[${item.areas.join('、')}]</span>
+                  <div class="ledger-date">${item.date} · ${escapeHtml(item.remark || '无备注')}</div>
+                </div>
+                <button onclick="deleteLedgerItem('${p.id}', '${item.id}')" style="background:transparent; border:none; color:#475569; font-size:15px; padding:6px;">✕</button>
+              </div>
+            `).join('')
+          : '<div style="font-size:13px; color:#475569; padding:8px 0;">暂无部位往来记录</div>';
+
+        card.innerHTML = `
+          <div class="card-header" onclick="toggleCard('${p.id}')">
+            <div class="patient-name-box">
+              <div class="patient-name">${escapeHtml(p.name)}</div>
+              ${p.phone ? `<div class="patient-phone">📞 ${escapeHtml(p.phone)}</div>` : ''}
+            </div>
+            ${badgeHtml}
+          </div>
+          <div class="card-summary-tags" onclick="toggleCard('${p.id}')">${summaryTagsHtml}</div>
+
+          <div class="card-body">
+            <div class="detail-row">
+              <div class="detail-label">全部特征与体态</div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                ${(p.tags || []).map(t => `<span class="sum-tag" style="background:#1a2136; color:#cbd5e1; font-size:13px;">${escapeHtml(t)}</span>`).join('') || '<span style="color:#64748b; font-size:13px;">无标签</span>'}
+              </div>
+            </div>
+
+            ${p.note ? `
+              <div class="detail-row">
+                <div class="detail-label">特别禁忌 / 备忘</div>
+                <div class="detail-val" style="color:#fbbf24;">⚠️ ${escapeHtml(p.note)}</div>
+              </div>
+            ` : ''}
+
+            <div class="ledger-box">
+              <div class="ledger-head">
+                <span>部位往来记账明细</span>
+                <span style="color:#38bdf8; cursor:pointer;" onclick="openLedgerModal('${p.id}')">+ 记一笔</span>
+              </div>
+              <div>${ledgerItemsHtml}</div>
+            </div>
+
+            <div class="card-actions">
+              <button class="btn-act btn-record" onclick="openLedgerModal('${p.id}')">记部位往来</button>
+              <button class="btn-act btn-edit" onclick="editPatient('${p.id}')">编辑档案</button>
+              <button class="btn-act btn-del" onclick="deletePatient('${p.id}')">删除</button>
+            </div>
+          </div>
+        `;
+        listEl.appendChild(card);
+      });
+    }
+
+    // 4. 标签选择抽屉渲染 (支持分类、增删)
+    function renderTagPicker() {
+      const container = document.getElementById('tagCategoriesContainer');
+      container.innerHTML = '';
+
+      Object.keys(tagLibrary).forEach(catName => {
+        const catBox = document.createElement('div');
+        catBox.innerHTML = `
+          <div class="tag-category-title">
+            <span>${escapeHtml(catName)}</span>
+          </div>
+          <div class="tag-grid" id="cat-grid-${catName}"></div>
+        `;
+        const grid = catBox.querySelector(`#cat-grid-${catName}`);
+        
+        tagLibrary[catName].forEach(tagName => {
+          const isSelected = currentSelectedTags.includes(tagName);
+          const tagEl = document.createElement('div');
+          tagEl.className = `picker-capsule ${isSelected ? 'active' : ''} ${isTagDeleteMode ? 'delete-mode' : ''}`;
+          tagEl.innerHTML = `
+            <span>${escapeHtml(tagName)}</span>
+            ${isTagDeleteMode ? `<span class="capsule-remove-btn" onclick="deleteCustomTag(event, '${catName}', '${tagName}')">✕</span>` : ''}
+          `;
+          
+          tagEl.addEventListener('click', (e) => {
+            if (isTagDeleteMode) return;
+            if (currentSelectedTags.includes(tagName)) {
+              currentSelectedTags = currentSelectedTags.filter(t => t !== tagName);
+              tagEl.classList.remove('active');
+            } else {
+              currentSelectedTags.push(tagName);
+              tagEl.classList.add('active');
+            }
+          });
+
+          grid.appendChild(tagEl);
+        });
+
+        container.appendChild(catBox);
+      });
+    }
+
+    // 回显已选标签在主模态框中
+    function updateSelectedTagsDisplay() {
+      const box = document.getElementById('selectedTagsDisplay');
+      const count = currentSelectedTags.length;
+      document.getElementById('triggerBtnText').innerText = `🏷️ 点击展开选择特征标签 (已选 ${count} 个)`;
+
+      if (count === 0) {
+        box.innerHTML = `<span style="color:#64748b; font-size:13px; align-self:center;">暂未选择任何特征标签</span>`;
+        return;
+      }
+
+      box.innerHTML = '';
+      currentSelectedTags.forEach(tag => {
+        const span = document.createElement('span');
+        span.className = 'selected-capsule';
+        span.innerHTML = `
+          <span>${escapeHtml(tag)}</span>
+          <span class="selected-capsule-del" data-tag="${escapeHtml(tag)}">✕</span>
+        `;
+        span.querySelector('.selected-capsule-del').addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentSelectedTags = currentSelectedTags.filter(t => t !== tag);
+          updateSelectedTagsDisplay();
+        });
+        box.appendChild(span);
+      });
+    }
+
+    // 动态添加新标签到库中
+    window.deleteCustomTag = function(e, cat, tag) {
+      e.stopPropagation();
+      if (!confirm(`确定在标签库中删除【${tag}】吗？`)) return;
+      tagLibrary[cat] = tagLibrary[cat].filter(t => t !== tag);
+      currentSelectedTags = currentSelectedTags.filter(t => t !== tag);
+      saveAll();
+      renderTagPicker();
+      updateSelectedTagsDisplay();
+    };
+
+    // 5. 事件绑定与交互逻辑
+    function initEvents() {
+      // 搜索响应
+      document.getElementById('searchInput').addEventListener('input', renderList);
+
+      // 筛选过滤器
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.dataset.filter;
+          renderList();
+        });
+      });
+
+      // 打开新建患者模态框
+      document.getElementById('openAddModalBtn').addEventListener('click', () => {
+        editingPatientId = null;
+        document.getElementById('patientModalTitle').innerText = '登记新患者档案';
+        document.getElementById('pName').value = '';
+        document.getElementById('pPhone').value = '';
+        document.getElementById('pNote').value = '';
+        currentSelectedTags = [];
+        updateSelectedTagsDisplay();
+        document.getElementById('patientModal').classList.add('show');
+      });
+
+      const closePatient = () => document.getElementById('patientModal').classList.remove('show');
+      document.getElementById('closePatientModal').addEventListener('click', closePatient);
+      document.getElementById('cancelPatientBtn').addEventListener('click', closePatient);
+
+      // 展开长标签选择抽屉
+      document.getElementById('openTagPickerBtn').addEventListener('click', () => {
+        isTagDeleteMode = false;
+        document.getElementById('toggleDeleteModeBtn').innerText = '⚙️ 开启标签删除模式';
+        renderTagPicker();
+        document.getElementById('tagPickerModal').classList.add('show');
+      });
+
+      document.getElementById('confirmTagsBtn').addEventListener('click', () => {
+        document.getElementById('tagPickerModal').classList.remove('show');
+        updateSelectedTagsDisplay();
+      });
+
+      // 切换删除模式
+      document.getElementById('toggleDeleteModeBtn').addEventListener('click', () => {
+        isTagDeleteMode = !isTagDeleteMode;
+        document.getElementById('toggleDeleteModeBtn').innerText = isTagDeleteMode ? '✓ 退出删除模式' : '⚙️ 开启标签删除模式';
+        renderTagPicker();
+      });
+
+      // 添加新标签按钮
+      document.getElementById('addNewTagBtn').addEventListener('click', () => {
+        const cat = document.getElementById('newTagCategory').value;
+        const val = document.getElementById('newTagInput').value.trim();
+        if (!val) return;
+        if (!tagLibrary[cat]) tagLibrary[cat] = [];
+        if (!tagLibrary[cat].includes(val)) {
+          tagLibrary[cat].push(val);
+          currentSelectedTags.push(val); // 自动勾选
+          document.getElementById('newTagInput').value = '';
+          saveAll();
+          renderTagPicker();
+          updateSelectedTagsDisplay();
+        }
+      });
+
+      // 保存档案
+      document.getElementById('savePatientBtn').addEventListener('click', () => {
+        const name = document.getElementById('pName').value.trim();
+        if (!name) { alert('请输入患者姓名或称呼！'); return; }
+
+        const phone = document.getElementById('pPhone').value.trim();
+        const note = document.getElementById('pNote').value.trim();
+
+        if (editingPatientId) {
+          const idx = patients.findIndex(p => p.id === editingPatientId);
+          if (idx !== -1) {
+            patients[idx].name = name;
+            patients[idx].phone = phone;
+            patients[idx].tags = [...currentSelectedTags];
+            patients[idx].note = note;
+          }
+        } else {
+          patients.unshift({
+            id: 'p_' + Date.now(),
+            name,
+            phone,
+            tags: [...currentSelectedTags],
+            note,
+            ledger: [],
+            createdAt: new Date().toISOString()
+          });
+        }
+        closePatient();
+        saveAll();
+      });
+
+      // 记账模态框内部交互
+      ['typeDebtBtn', 'typeCreditBtn', 'typeSettleBtn'].forEach(id => {
+        document.getElementById(id).addEventListener('click', (e) => {
+          ['typeDebtBtn', 'typeCreditBtn', 'typeSettleBtn'].forEach(i => document.getElementById(i).classList.remove('active'));
+          e.currentTarget.classList.add('active');
+          currentLedgerType = e.currentTarget.dataset.type;
+        });
+      });
+
+      document.getElementById('minusPartBtn').addEventListener('click', () => {
+        if (currentPartCount > 1) {
+          currentPartCount--;
+          document.getElementById('partCountDisplay').innerText = currentPartCount;
+        }
+      });
+      document.getElementById('plusPartBtn').addEventListener('click', () => {
+        currentPartCount++;
+        document.getElementById('partCountDisplay').innerText = currentPartCount;
+      });
+
+      document.querySelectorAll('#areaSelector .picker-capsule').forEach(cap => {
+        cap.addEventListener('click', () => cap.classList.toggle('active'));
+      });
+
+      const closeLedger = () => document.getElementById('ledgerModal').classList.remove('show');
+      document.getElementById('closeLedgerModal').addEventListener('click', closeLedger);
+      document.getElementById('cancelLedgerBtn').addEventListener('click', closeLedger);
+
+      document.getElementById('saveLedgerBtn').addEventListener('click', () => {
+        if (!targetLedgerPatientId) return;
+        const patient = patients.find(p => p.id === targetLedgerPatientId);
+        if (!patient) return;
+
+        const areas = Array.from(document.querySelectorAll('#areaSelector .picker-capsule.active')).map(c => c.innerText);
+        const remark = document.getElementById('ledgerRemark').value.trim();
+
+        if (!patient.ledger) patient.ledger = [];
+        patient.ledger.unshift({
+          id: 'l_' + Date.now(),
+          date: new Date().toLocaleDateString(),
+          type: currentLedgerType,
+          parts: currentPartCount,
+          areas: areas.length ? areas : ['常规调理'],
+          remark
+        });
+
+        closeLedger();
+        saveAll();
+      });
+    }
+
+    // 辅助计算与操作
+    function calcNetBalance(ledger) {
+      return ledger.reduce((total, cur) => {
+        if (cur.type === 'debt') return total + Number(cur.parts);
+        if (cur.type === 'credit') return total - Number(cur.parts);
+        if (cur.type === 'settle') {
+          if (total > 0) return Math.max(0, total - Number(cur.parts));
+          if (total < 0) return Math.min(0, total + Number(cur.parts));
+        }
+        return total;
+      }, 0);
+    }
+
+    function toggleCard(id) {
+      const card = document.getElementById(`patient-card-${id}`);
+      if (card) card.classList.toggle('expanded');
+    }
+
+    window.openLedgerModal = function(id) {
+      targetLedgerPatientId = id;
+      const patient = patients.find(p => p.id === id);
+      if (!patient) return;
+      document.getElementById('ledgerTargetName').innerText = `正在为【${patient.name}】记录部位往来`;
+      currentPartCount = 1;
+      document.getElementById('partCountDisplay').innerText = '1';
+      document.getElementById('ledgerRemark').value = '';
+      currentLedgerType = 'debt';
+      ['typeDebtBtn', 'typeCreditBtn', 'typeSettleBtn'].forEach(i => document.getElementById(i).classList.remove('active'));
+      document.getElementById('typeDebtBtn').classList.add('active');
+      document.getElementById('ledgerModal').classList.add('show');
+    };
+
+    window.deleteLedgerItem = function(patientId, ledgerId) {
+      if (!confirm('确定删除此条部位记录？')) return;
+      const p = patients.find(x => x.id === patientId);
+      if (p && p.ledger) {
+        p.ledger = p.ledger.filter(l => l.id !== ledgerId);
+        saveAll();
+      }
+    };
+
+    window.editPatient = function(id) {
+      const p = patients.find(x => x.id === id);
+      if (!p) return;
+      editingPatientId = id;
+      document.getElementById('patientModalTitle').innerText = '编辑患者档案';
+      document.getElementById('pName').value = p.name;
+      document.getElementById('pPhone').value = p.phone || '';
+      document.getElementById('pNote').value = p.note || '';
+      currentSelectedTags = [...(p.tags || [])];
+      updateSelectedTagsDisplay();
+      document.getElementById('patientModal').classList.add('show');
+    };
+
+    window.deletePatient = function(id) {
+      const p = patients.find(x => x.id === id);
+      if (!confirm(`确定彻底删除【${p.name}】的所有档案及账目？`)) return;
+      patients = patients.filter(x => x.id !== id);
+      saveAll();
+    };
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>'"]/g, t => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[t]));
+    }
+  </script>
+</body>
+</html>
