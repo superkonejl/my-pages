@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Cloud Note · 我的云端便签</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body { background-color: #07080c; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  </style>
+</head>
+<body class="min-h-screen p-4 flex flex-col justify-between max-w-md mx-auto">
+
+  <header class="flex items-center justify-between py-2 border-b border-gray-800">
+    <div class="flex items-center gap-2">
+      <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+      <h1 class="text-sm font-extrabold tracking-tight">我的 VPS 云端便签</h1>
+    </div>
+    <button id="refreshBtn" class="p-2 rounded-xl bg-gray-900 border border-gray-800 text-gray-300 active:scale-95 transition">
+      <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+    </button>
+  </header>
+
+  <!-- 输入区 -->
+  <main class="flex-1 py-4 space-y-4">
+    <div class="bg-[#111420] border border-gray-800 rounded-2xl p-3.5 space-y-2.5">
+      <textarea id="noteInput" rows="3" placeholder="写下想法、备忘或要同步的文字..." class="w-full bg-[#161a29] border border-gray-800 rounded-xl p-3 text-xs text-white placeholder-gray-500 outline-none resize-none focus:border-emerald-400 transition"></textarea>
+      <button id="saveBtn" class="w-full py-3 rounded-xl bg-emerald-400 text-black font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow-lg shadow-emerald-500/20">
+        <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+        <span>同步存入 VPS 数据库</span>
+      </button>
+    </div>
+
+    <!-- 列表展示 -->
+    <div class="space-y-2">
+      <div class="flex justify-between items-center px-1">
+        <span class="text-xs font-bold text-gray-400">云端记录列表</span>
+        <span id="countText" class="text-xs text-emerald-400 font-mono">0 条</span>
+      </div>
+      <div id="notesList" class="space-y-2">
+        <p id="loadingTip" class="text-center py-8 text-xs text-gray-500">正在连接你的 VPS 读取数据...</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="text-center py-2 text-[10px] text-gray-600 font-mono">
+    CONNECTED TO 107.173.155.165 · POCKETBASE
+  </footer>
+
+  <script>
+    if (window.lucide) lucide.createIcons();
+
+    // 你的 VPS 专属数据库接口地址
+    const API_URL = 'https://107.173.155.165.sslip.io/api/collections/notes/records';
+
+    const noteInput = document.getElementById('noteInput');
+    const saveBtn = document.getElementById('saveBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const notesList = document.getElementById('notesList');
+    const countText = document.getElementById('countText');
+
+    // 1. 从你的 VPS 读取全部便签
+    async function loadNotes() {
+      try {
+        const res = await fetch(`${API_URL}?sort=-created`);
+        if (!res.ok) throw new Error('读取失败');
+        const data = await res.json();
+        renderNotes(data.items);
+      } catch (err) {
+        notesList.innerHTML = `<p class="text-center py-6 text-xs text-red-400">无法读取: ${err.message}</p>`;
+      }
+    }
+
+    // 2. 渲染列表
+    function renderNotes(items) {
+      countText.innerText = `${items.length} 条`;
+      if (items.length === 0) {
+        notesList.innerHTML = `<p class="text-center py-8 text-xs text-gray-500">云端数据库空空如也，发一条试试吧！</p>`;
+        return;
+      }
+      notesList.innerHTML = '';
+      items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'bg-[#111420] border border-gray-800 rounded-xl p-3 flex justify-between items-start gap-2';
+        card.innerHTML = `
+          <div class="flex-1 break-all">
+            <p class="text-xs text-white leading-relaxed">${escapeHtml(item.textcontent || '')}</p>
+            <span class="text-[10px] text-gray-500 mt-1 block">${new Date(item.created).toLocaleString()}</span>
+          </div>
+          <button class="del-btn text-gray-500 hover:text-red-400 p-1 active:scale-90 transition" data-id="${item.id}">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+        notesList.appendChild(card);
+      });
+
+      document.querySelectorAll('.del-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteNote(btn.dataset.id));
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // 3. 提交新内容存入 VPS
+    async function saveNote() {
+      const text = noteInput.value.trim();
+      if (!text) return;
+      saveBtn.disabled = true;
+      saveBtn.innerText = '正在存入云端...';
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ textcontent: text })
+        });
+        if (!res.ok) throw new Error('保存失败');
+        noteInput.value = '';
+        await loadNotes();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<i data-lucide="cloud-upload" class="w-4 h-4"></i> <span>同步存入 VPS 数据库</span>`;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    // 4. 删除某一条记录
+    async function deleteNote(id) {
+      try {
+        await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        loadNotes();
+      } catch (e) {}
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[tag] || tag));
+    }
+
+    saveBtn.addEventListener('click', saveNote);
+    refreshBtn.addEventListener('click', loadNotes);
+    loadNotes();
+  </script>
+</body>
+</html>
