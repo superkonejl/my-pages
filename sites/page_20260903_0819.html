@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Nebula Focus · 极简时钟与专注</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            oled: '#050608',
+            panel: '#0e111a',
+            border: '#1e2333',
+            neon: '#10b981',
+            accent: '#6366f1'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #050608;
+      color: #f3f4f6;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Roboto, "Helvetica Neue", sans-serif;
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+    /* 呼吸动画 */
+    @keyframes breatheCycle {
+      0%, 100% { transform: scale(0.92); opacity: 0.3; }
+      50% { transform: scale(1.15); opacity: 0.85; }
+    }
+    .breathing-glow {
+      animation: breatheCycle 6s ease-in-out infinite;
+    }
+    /* 霓虹辉光 */
+    .glow-text {
+      text-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 selection:bg-emerald-500 selection:text-black">
+
+  <!-- 顶部状态栏 -->
+  <header class="flex items-center justify-between pt-1">
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+      <span class="text-xs font-semibold tracking-wider text-gray-400 uppercase">Nebula Focus</span>
+    </div>
+    <!-- 模式切换：时钟模式 / 番茄专注 / 4-7-8呼吸 -->
+    <div class="flex bg-panel border border-border rounded-full p-1 text-xs">
+      <button id="modeClock" class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-medium transition">时钟</button>
+      <button id="modeTimer" class="px-3 py-1 rounded-full text-gray-400 hover:text-white transition">专注</button>
+      <button id="modeBreathe" class="px-3 py-1 rounded-full text-gray-400 hover:text-white transition">呼吸</button>
+    </div>
+  </header>
+
+  <!-- 核心展示区 -->
+  <main class="flex-1 flex flex-col items-center justify-center relative py-8">
+    
+    <!-- 背景流光圆环 -->
+    <div id="ambientRing" class="absolute w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none breathing-glow"></div>
+
+    <!-- 1. 动态时钟面板 -->
+    <section id="clockSection" class="flex flex-col items-center space-y-2 z-10">
+      <p id="currentDate" class="text-xs tracking-widest text-emerald-400/80 font-mono uppercase">2026-09-03 星期四</p>
+      <h1 id="currentTime" class="text-6xl sm:text-7xl font-extrabold tracking-tighter text-white font-mono glow-text">
+        00:00:00
+      </h1>
+      <p id="dayQuote" class="text-xs text-gray-500 pt-1 text-center max-w-xs">
+        “行远必自迩，登高必自卑。”
+      </p>
+    </section>
+
+    <!-- 2. 番茄专注面板 (默认隐藏) -->
+    <section id="timerSection" class="hidden flex-col items-center space-y-5 z-10 w-full max-w-xs">
+      <div class="text-center">
+        <span class="text-5xl font-mono font-bold tracking-tight text-white" id="timerDisplay">25:00</span>
+        <p class="text-[11px] text-gray-400 mt-1" id="timerStatusText">专注阶段 · 保持纯净心境</p>
+      </div>
+      
+      <!-- 快捷时长选择 -->
+      <div class="flex gap-2">
+        <button class="time-preset px-3 py-1.5 rounded-xl bg-panel border border-border text-xs text-gray-300 hover:border-emerald-500" data-min="15">15分钟</button>
+        <button class="time-preset px-3 py-1.5 rounded-xl bg-panel border border-emerald-500 text-xs text-emerald-400" data-min="25">25分钟</button>
+        <button class="time-preset px-3 py-1.5 rounded-xl bg-panel border border-border text-xs text-gray-300 hover:border-emerald-500" data-min="45">45分钟</button>
+      </div>
+
+      <!-- 控制按键 -->
+      <div class="flex gap-3 w-full">
+        <button id="toggleTimerBtn" class="flex-1 py-3 rounded-2xl bg-emerald-500 text-black font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition shadow-lg shadow-emerald-500/25">
+          <i data-lucide="play" class="w-4 h-4 fill-current"></i> 开始专注
+        </button>
+        <button id="resetTimerBtn" class="p-3 rounded-2xl bg-panel border border-border text-gray-400 active:scale-95 transition">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. 4-7-8 舒压呼吸面板 (默认隐藏) -->
+    <section id="breatheSection" class="hidden flex-col items-center justify-center space-y-6 z-10">
+      <div class="relative flex items-center justify-center w-52 h-52">
+        <div id="breatheCircle" class="absolute inset-0 rounded-full border-2 border-emerald-400/30 bg-emerald-500/10 transition-transform duration-1000 ease-in-out"></div>
+        <div class="text-center z-10">
