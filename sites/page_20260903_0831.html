@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Nebula Blocks · 极简俄罗斯方块</title>
+  
+  <!-- 手机端独立 App 模式 -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#07080c">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            oled: '#050608',
+            panel: '#0e111a',
+            border: '#2a3148',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      box-sizing: border-box;
+      touch-action: none;
+    }
+    body {
+      background-color: #050608;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-top: env(safe-area-inset-top, 10px);
+      padding-bottom: env(safe-area-inset-bottom, 10px);
+    }
+    
+    /* 游戏画布样式：保持高对比度与清晰度 */
+    #gameCanvas {
+      background: #000000;
+      border: 2px solid #2a3148;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+      display: block;
+    }
+    
+    /* 霓虹辉光文字 */
+    .glow-emerald {
+      text-shadow: 0 0 12px rgba(16, 185, 129, 0.7);
+    }
+    
+    /* 按键按下效果 */
+    .btn-active:active {
+      background-color: #1f293a !important;
+      transform: scale(0.96);
+      border-color: #10b981 !important;
+    }
+    .btn-active:active i {
+      color: #34d399 !important;
+    }
+  </style>
+</head>
+<body class="selection:bg-emerald-500 selection:text-black">
+
+  <!-- 顶部状态栏：得分与下一块预览 (高对比度白字) -->
+  <header class="w-full max-w-sm mx-auto px-4 py-2 flex items-center justify-between z-10 shrink-0">
+    <div class="flex items-center gap-2">
+      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50 animate-pulse"></div>
+      <span class="text-sm font-extrabold text-white tracking-wider uppercase">Nebula Blocks</span>
+    </div>
+    
+    <div class="flex gap-4">
+      <div class="text-right">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SCORE</p>
+        <p id="scoreDisplay" class="text-xl font-mono font-extrabold text-white glow-emerald">0</p>
+      </div>
+      <div class="text-right">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LEVEL</p>
+        <p id="levelDisplay" class="text-xl font-mono font-extrabold text-emerald-300">1</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- 游戏区域 -->
+  <main class="flex-1 flex items-center justify-center relative min-h-0 px-2 py-2">
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- 游戏开始/结束 覆盖层 -->
+    <div id="overlay" class="absolute inset-0 bg-black/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center space-y-6 rounded-2xl hidden p-6 text-center">
+      <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-xl shadow-emerald-500/30">
+        <i data-lucide="layout-grid" class="w-8 h-8 text-black stroke-[3]"></i>
+      </div>
+      <div class="space-y-1">
+        <h2 id="overlayTitle" class="text-2xl font-extrabold text-white tracking-tighter">开始游戏</h2>
+        <p id="overlaySubTitle" class="text-sm font-medium text-slate-300">调整节奏，放空思绪，享受方块的律动</p>
+      </div>
+      <button id="startBtn" class="px-10 py-3 rounded-2xl bg-emerald-500 text-black font-extrabold text-sm flex items-center gap-2 active:scale-95 transition shadow-lg shadow-emerald-500/30">
+        <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+        <span id="startBtnText">立即开始</span>
+      </button>
+    </div>
+  </main>
+
+  <!-- 底部触屏控制区：符合人体工学的超大按键 -->
+  <footer class="w-full max-w-md mx-auto px-4 pb-3 pt-1 shrink-0 z-10 space-y-3">
+    <!-- 旋转与功能键单行 -->
+    <div class="flex justify-center gap-3">
+        <button id="ctrlRotate" class="btn-active flex-1 max-w-[120px] h-14 rounded-2xl bg-panel border border-border flex items-center justify-center transition">
+            <i data-lucide="rotate-cw" class="w-6 h-6 text-white stroke-[2.5]"></i>
+        </button>
+        <button id="pauseBtn" class="flex-1 max-w-[120px] h-14 rounded-2xl bg-panel border border-border flex items-center justify-center active:scale-95 transition">
+            <i id="pauseIcon" data-lucide="pause" class="w-5 h-5 text-slate-400"></i>
+        </button>
+    </div>
+
+    <!-- 核心十字控制方向键（超大尺寸，大拇指易操作） -->
+    <div class="grid grid-cols-3 gap-3 justify-items-center max-w-[320px] mx-auto">
+      <div></div>
+      <!-- 上 (通常俄罗斯方块不使用，保留占位或设为瞬间下落) -->
+      <button id="ctrlHardDrop" class="btn-active w-20 h-16 rounded-2xl bg-panel border border-border flex items-center justify-center transition">
+        <i data-lucide="chevrons-down" class="w-6 h-6 text-slate-200 stroke-[2.5]"></i>
+      </button>
+      <div></div>
+
+      <!-- 左 -->
+      <button id="ctrlLeft" class="btn-active w-24 h-18 rounded-2xl bg-panel border border-dark-border flex items-center justify-center transition">
+        <i data-lucide="arrow-left" class="w-7 h-7 text-white stroke-[3]"></i>
+      </button>
+      <!-- 下 (软下落) -->
+      <button id="ctrlDown" class="btn-active w-20 h-16 rounded-2xl bg-panel border border-border flex items-center justify-center transition">
+        <i data-lucide="arrow-down" class="w-7 h-7 text-white stroke-[3]"></i>
+      </button>
+      <!-- 右 -->
+      <button id="ctrlRight" class="btn-active w-24 h-18 rounded-2xl bg-panel border border-dark-border flex items-center justify-center transition">
+        <i data-lucide="arrow-right" class="w-7 h-7 text-white stroke-[3]"></i>
+      </button>
+    </div>
+  </footer>
+
+  <script>
+    // 初始化图标
+    if (window.lucide) lucide.createIcons();
+
+    // 触觉反馈 (仅支持 Android Chrome)
+    function haptic(ms = 25) {
+      if (navigator.vibrate) {
+        try { navigator.vibrate(ms); } catch (e) {}
+      }
+    }
+
+    // 游戏配置与常量
+    const ROWS = 20;
+    const COLS = 10;
+    // 荧光色方块 (高对比度 OLED 友好)
+    const COLORS = [
+      null,
+      '#FF0D72', // T (紫红)
+      '#0DC2FF', // I (青蓝)
+      '#0DFF72', // S (荧光绿)
+      '#F538FF', // Z (亮紫)
+      '#FF8E0D', // L (亮橙)
+      '#FFE138', // O (明黄)
+      '#3877FF', // J (宝蓝)
+    ];
+
+    const PIECES = [
+      null,
+      [[0, 1, 0], [1, 1, 1], [0, 0, 0]], // T
+      [[0, 2, 0, 0], [0, 2, 0, 0], [0, 2, 0, 0], [0, 2, 0, 0]], // I
+      [[0, 3, 3], [3, 3, 0], [0, 0, 0]], // S
+      [[4, 4, 0], [0, 4, 4], [0, 0, 0]], // Z
+      [[5, 0, 0], [5, 5, 5], [0, 0, 0]], // L
+      [[6, 6], [6, 6]], // O
+      [[0, 0, 7], [7, 7, 7], [0, 0, 0]], // J
+    ];
+
+    // Canvas 初始化
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const levelDisplay = document.getElementById('levelDisplay');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('startBtn');
+    
+    // 动态计算方块大小以适配不同手机屏幕
+    let blockSize;
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      const maxWidth = container.clientWidth - 16; // 考虑 padding
+      const maxHeight = container.clientHeight - 16;
+      
+      // 根据屏幕宽度基准计算 blockSize，但不能超过最大高度限制
+      let calculatedSize = Math.floor(maxWidth / COLS);
+      if (calculatedSize * ROWS > maxHeight) {
+        calculatedSize = Math.floor(maxHeight / ROWS);
+      }
+      
+      blockSize = calculatedSize;
+      canvas.width = blockSize * COLS;
+      canvas.height = blockSize * ROWS;
+      
+      // 保持线条清晰
+      ctx.imageSmoothingEnabled = false;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // 游戏状态变量
+    let board = createMatrix(COLS, ROWS);
+    let player = {
+      pos: {x: 0, y: 0},
+      matrix: null,
+      score: 0,
+      level: 1,
+      lines: 0,
+    };
+    let dropCounter = 0;
+    let dropInterval = 1000; // 初始速度 (1秒一格)
+    let lastTime = 0;
+    let isPaused = true;
+    let isGameOver = false;
+
+    // 辅助函数：创建矩阵
+    function createMatrix(w, h) {
+      const matrix = [];
+      while (h--) {
+        matrix.push(new Array(w).fill(0));
+      }
+      return matrix;
+    }
+
+    // 碰撞检测
+    function collide(board, player) {
+      const m = player.matrix;
+      const o = player.pos;
+      for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < m[y].length; ++x) {
+          if (m[y][x] !== 0 &&
+             (board[y + o.y] && board[y + o.y][x + o.x]) !== 0) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // 绘制方块 (带内阴影，增加质感)
+    function drawSquare(x, y, colorIndex) {
+      const color = COLORS[colorIndex];
+      ctx.fillStyle = color;
+      ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
+      
+      // 增加简单的方块高光与阴影，使其看起来不呆板
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; // 亮边
+      ctx.strokeRect(x * blockSize + 1, y * blockSize + 1, blockSize - 2, blockSize - 2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; // 暗边
+      ctx.strokeRect(x * blockSize + blockSize/2, y * blockSize + blockSize/2, blockSize/2 - 1, blockSize/2 - 1);
+    }
+
+    // 渲染主循环
+    function draw() {
+      // 清空画布 (纯黑)
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 绘制网格线 (低对比度，辅助作用)
+      ctx.strokeStyle = 'rgba(42, 49, 72, 0.5)';
+      ctx.lineWidth = 0.5;
+      for(let x=0; x<=COLS; x++) {
+          ctx.beginPath();
+          ctx.moveTo(x*blockSize, 0);
+          ctx.lineTo(x*blockSize, canvas.height);
+          ctx.stroke();
+      }
+      for(let y=0; y<=ROWS; y++) {
+          ctx.beginPath();
+          ctx.moveTo(0, y*blockSize);
+          ctx.lineTo(canvas.width, y*blockSize);
+          ctx.stroke();
+      }
+
+      // 绘制锁定的块
+      board.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            drawSquare(x, y, value);
+          }
+        });
+      });
+      
+      // 绘制当前移动的块
+      if (player.matrix) {
+        player.matrix.forEach((row, y) => {
+          row.forEach((value, x) => {
+            if (value !== 0) {
+              drawSquare(x + player.pos.x, y + player.pos.y, value);
+            }
+          });
+        });
+      }
+    }
+
+    // 将积木锁定到棋盘
+    function merge(board, player) {
+      player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            board[y + player.pos.y][x + player.pos.x] = value;
+          }
+        });
+      });
+      haptic(15); // 落地反馈
+    }
+
+    // 旋转矩阵
+    function rotate(matrix, dir) {
+      for (let y = 0; y < matrix.length; ++y) {
+        for (let x = 0; x < y; ++x) {
+          [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        }
+      }
+      if (dir > 0) {
+        matrix.forEach(row => row.reverse());
+      } else {
+        matrix.reverse();
+      }
+    }
+
+    // 玩家旋转操作 (带墙壁踢，防止卡墙)
+    function playerRotate(dir) {
+      const pos = player.pos.x;
+      let offset = 1;
+      rotate(player.matrix, dir);
+      while (collide(board, player)) {
+        player.pos.x += offset;
+        offset = -(offset + (offset > 0 ? 1 : -1));
+        if (offset > player.matrix[0].length) {
+          // 旋转失败，旋回
+          rotate(player.matrix, -dir);
+          player.pos.x = pos;
+          return;
+        }
+      }
+      haptic(20); // 旋转反馈
+    }
+
+    // 生成新积木
+    function playerReset() {
+      const id = (PIECES.length - 1) * Math.random() | 0;
+      player.matrix = PIECES[id + 1];
+      // 初始位置：顶部中央
+      player.pos.y = 0;
+      player.pos.x = (board[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+      
+      // 刚生成就碰撞 = 游戏结束
+      if (collide(board, player)) {
+        endGame();
+      }
+    }
+
+    // 消除行逻辑
+    function arenaSweep() {
+      let rowCount = 0;
+      outer: for (let y = board.length -1; y > 0; --y) {
+        for (let x = 0; x < board[y].length; ++x) {
+          if (board[y][x] === 0) {
+            continue outer;
+          }
+        }
+        
+        const row = board.splice(y, 1)[0].fill(0);
+        board.unshift(row);
+        ++y;
+        rowCount++;
+      }
+      
+      if (rowCount > 0) {
+        // 得分逻辑 (1行100, 2行300, 3行500, 4行800) * 等级
+        const lineScores = [0, 100, 300, 500, 800];
+        player.score += lineScores[rowCount] * player.level;
+        player.lines += rowCount;
+        
+        // 升级逻辑：每消10行升一级
+        player.level = Math.floor(player.lines / 10) + 1;
+        // 速度递增：下落间隔变短，最快100ms
+        dropInterval = Math.max(100, 1000 - (player.level - 1) * 100);
+        
+        updateScoreUI();
+        // 消除反馈：多行消除触觉更强
+        haptic(rowCount === 4 ? [40, 30, 40, 30, 40] : 35); 
+      }
+    }
+
+    // 玩家下落操作
+    function playerDrop() {
+      player.pos.y++;
+      if (collide(board, player)) {
+        player.pos.y--; // 移回上一格
+        merge(board, player);
+        arenaSweep(); // 检查消除
+        playerReset(); // 生成新的
+      }
+      dropCounter = 0;
+    }
+
+    // 瞬间下落 (Hard Drop)
+    function playerHardDrop() {
+        haptic(30);
+        while (!collide(board, player)) {
+            player.pos.y++;
+        }
+        player.pos.y--; // 移回有效的一格
+        merge(board, player);
+        arenaSweep();
+        playerReset();
+        dropCounter = 0;
+    }
+
+    // 玩家左右移动
+    function playerMove(offset) {
+      player.pos.x += offset;
+      if (collide(board, player)) {
+        player.pos.x -= offset;
+      } else {
+          haptic(10); // 移动反馈
+      }
+    }
+
+    // 更新 UI 显示
+    function updateScoreUI() {
+      scoreDisplay.innerText = player.score;
+      levelDisplay.innerText = player.level;
+    }
+
+    // 游戏主循环 (处理时间与下落)
+    function update(time = 0) {
+      if (isPaused || isGameOver) return;
+      
+      const deltaTime = time - lastTime;
+      lastTime = time;
+
+      dropCounter += deltaTime;
+      if (dropCounter > dropInterval) {
+        playerDrop();
+      }
+
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    // 开始/重置游戏
+    function startGame() {
+      haptic(50);
+      board = createMatrix(COLS, ROWS);
+      player.score = 0;
+      player.level = 1;
+      player.lines = 0;
+      dropInterval = 1000;
+      updateScoreUI();
+      playerReset();
+      isPaused = false;
+      isGameOver = false;
+      overlay.classList.add('hidden');
+      update();
+    }
+
+    // 游戏结束
+    function endGame() {
+      haptic([100, 50, 100, 50, 300]);
+      isGameOver = true;
+      document.getElementById('overlayTitle').innerText = "游戏结束";
+      document.getElementById('overlaySubTitle').innerHTML = `最终得分: <span class="text-emerald-400 font-mono font-bold">${player.score}</span><br>消行: ${player.lines}`;
+      document.getElementById('startBtnText').innerText = "再玩一次";
+      overlay.classList.remove('hidden');
+    }
+
+    // 暂停/继续
+    const pauseBtn = document.getElementById('pauseBtn');
+    const pauseIcon = document.getElementById('pauseIcon');
+    function togglePause() {
+        if(isGameOver) return;
+        haptic(25);
+        isPaused = !isPaused;
+        if(isPaused) {
+            pauseIcon.setAttribute('data-lucide', 'play');
+            document.getElementById('overlayTitle').innerText = "游戏暂停";
+            document.getElementById('overlaySubTitle').innerText = "中场休息，稍后继续";
+            document.getElementById('startBtnText').innerText = "继续游戏";
+            overlay.classList.remove('hidden');
+        } else {
+            pauseIcon.setAttribute('data-lucide', 'pause');
+            overlay.classList.add('hidden');
+            lastTime = performance.now(); // 重置时间，防止跳帧
+            update();
+        }
+        lucide.createIcons();
+    }
+    pauseBtn.addEventListener('click', togglePause);
+    startBtn.addEventListener('click', () => {
+        if(isPaused && !isGameOver && player.matrix) {
+            togglePause();
+        } else {
+            startGame();
+        }
+    });
+
+    // --- 触屏控制绑定 ---
+    const controllers = [
+        {id: 'ctrlLeft', action: () => playerMove(-1)},
+        {id: 'ctrlRight', action: () => playerMove(1)},
+        {id: 'ctrlDown', action: () => playerDrop()},
+        {id: 'ctrlRotate', action: () => playerRotate(1)},
+        {id: 'ctrlHardDrop', action: () => playerHardDrop()},
+    ];
+
+    controllers.forEach(ctrl => {
+        const btn = document.getElementById(ctrl.id);
+        
+        // 使用 touchstart 以获得最快响应，并阻止默认滚动行为
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault(); 
+            if(isPaused || isGameOver) return;
+            ctrl.action();
+        }, {passive: false});
+        
+        // 针对下落键，支持长按连续下落
+        if(ctrl.id === 'ctrlDown') {
+            let interval = null;
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if(isPaused || isGameOver) return;
+                haptic(15);
+                clearInterval(interval);
+                // 立即执行一次
+                playerDrop();
+                // 建立循环，按住不放持续快速下落
+                interval = setInterval(playerDrop, 100); 
+            }, {passive: false});
+            
+            const stopInterval = () => clearInterval(interval);
+            btn.addEventListener('touchend', stopInterval);
+            btn.addEventListener('touchcancel', stopInterval);
+        }
+    });
+
+    // 初始化状态：显示开始覆盖层
+    updateScoreUI();
+    overlay.classList.remove('hidden');
+    draw(); // 绘制初始空盘
+  </script>
+</body>
+</html>
