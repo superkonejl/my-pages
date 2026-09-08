@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#121212">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>极简云速记</title>
+
+    <link rel="manifest" id="dynamic-manifest">
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --card-border: #2d2d2d;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent: #3b82f6;
+            --accent-active: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --glass: rgba(26, 26, 30, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 20px) 16px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 44px;
+        }
+
+        h1 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #1e1e1e;
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.92);
+            background: #2a2a2a;
+        }
+
+        .icon-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        .btn-install {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .input-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 14px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 90px;
+            background: #151515;
+            border: 1px solid #333;
+            border-radius: 10px;
+            color: var(--text-primary);
+            padding: 12px;
+            font-size: 1rem;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        textarea:focus {
+            border-color: var(--accent);
+        }
+
+        .btn-add {
+            background-color: var(--accent);
+            color: #ffffff;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            align-self: flex-end;
+        }
+
+        .btn-add:active {
+            background-color: var(--accent-active);
+        }
+
+        .list-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            padding: 0 4px;
+        }
+
+        .memo-item {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .memo-content {
+            font-size: 1rem;
+            line-height: 1.5;
+            word-break: break-word;
+            white-space: pre-wrap;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .memo-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            border-top: 1px solid #282828;
+            padding-top: 8px;
+        }
+
+        .memo-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .action-text {
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .action-text.delete:active {
+            color: var(--danger);
+        }
+
+        .empty-hint {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 40px 0;
+            font-size: 0.95rem;
+        }
+
+        /* 模态弹窗（云同步设置） */
+        .modal-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 99;
+        }
+
+        .modal-box {
+            width: 100%;
+            max-width: 380px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-shadow: 0 16px 36px rgba(0,0,0,0.6);
+        }
+
+        .modal-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-group label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .text-input {
+            width: 100%;
+            background: #141416;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            color: #ffffff;
+            font-size: 0.9rem;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .text-input:focus {
+            border-color: var(--accent);
+        }
+
+        .sync-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .btn-sync {
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: none;
+            color: #ffffff;
+        }
+
+        .btn-sync.upload {
+            background: var(--accent);
+        }
+
+        .btn-sync.download {
+            background: #10b981;
+        }
+
+        .btn-sync:active {
+            opacity: 0.85;
+            transform: scale(0.97);
+        }
+
+        .status-msg {
+            font-size: 0.8rem;
+            text-align: center;
+            min-height: 18px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>极简云速记</h1>
+        <div class="header-actions">
+            <!-- 云同步图标 -->
+            <button class="icon-btn" id="openSyncBtn" title="云同步">
+                <svg viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>
+            </button>
+
+            <!-- PWA 安装图标 -->
+            <button class="btn-install" id="installBtn">
+                <span>⬇</span> 安装
+            </button>
+        </div>
+    </header>
+
+    <div class="input-card">
+        <textarea id="memoInput" placeholder="写点什么...支持换行与云端同步"></textarea>
+        <button id="addBtn" class="btn-add">保存记录</button>
+    </div>
+
+    <div class="list-section">
+        <div class="list-header">
+            <span id="countText">全部记录 (0)</span>
+            <span id="clearAllBtn" class="action-text">清空本地</span>
+        </div>
+        <div id="memoList"></div>
+    </div>
+</div>
+
+<!-- 云同步弹窗 -->
+<div class="modal-mask" id="syncModal">
+    <div class="modal-box">
+        <div class="modal-title">
+            <span>GitHub 云同步</span>
+            <button class="icon-btn" style="width:28px;height:28px;" id="closeSyncBtn">
+                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+
+        <div class="input-group">
+            <label>GitHub 用户名</label>
+            <input type="text" class="text-input" id="ghUser" value="superkonejl" placeholder="例如 superkonejl">
+        </div>
+
+        <div class="input-group">
+            <label>Token (钥匙)</label>
+            <input type="password" class="text-input" id="ghToken" placeholder="粘贴 ghp_ 开头的钥匙">
+        </div>
+
+        <div class="sync-buttons">
+            <button class="btn-sync upload" id="uploadBtn">
+                <span>☁️</span> 备份到云端
+            </button>
+            <button class="btn-sync download" id="downloadBtn">
+                <span>⬇️</span> 从云端拉取
+            </button>
+        </div>
+
+        <div class="status-msg" id="statusMsg">未同步</div>
+    </div>
+</div>
+
+<script>
+/* ==========================================================
+ * 1. 动态 PWA 环境（彻底杜绝 GitHub Pages 404）
+ * ========================================================== */
+(function setupPWA() {
+    function createIcon() {
+        const c = document.createElement('canvas');
+        c.width = 512; c.height = 512;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#1e1e1e';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 512, 512, 110);
+        ctx.fill();
+
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 20;
+        ctx.stroke();
+
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillRect(140, 130, 230, 48);
+        ctx.fillRect(140, 230, 230, 48);
+        ctx.fillRect(140, 330, 150, 48);
+        return c.toDataURL('image/png');
+    }
+
+    const cleanUrl = window.location.origin + window.location.pathname;
+    const manifest = {
+        name: "极简云速记",
+        short_name: "云速记",
+        start_url: cleanUrl,
+        scope: "./",
+        display: "standalone",
+        background_color: "#121212",
+        theme_color: "#121212",
+        icons: [{ src: createIcon(), sizes: "512x512", type: "image/png" }]
+    };
+
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    document.getElementById('dynamic-manifest').href = URL.createObjectURL(blob);
+})();
+
+/* PWA 安装捕获 */
+let deferredPrompt = null;
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'inline-flex';
+});
+installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') installBtn.style.display = 'none';
+    deferredPrompt = null;
+});
+
+/* ==========================================================
+ * 2. 本地记事本基础交互
+ * ========================================================== */
+const STORAGE_KEY = 'minimal_cloud_memo_data';
+const CFG_KEY = 'minimal_cloud_memo_cfg';
+
+const memoInput = document.getElementById('memoInput');
+const addBtn = document.getElementById('addBtn');
+const memoList = document.getElementById('memoList');
+const countText = document.getElementById('countText');
+const clearAllBtn = document.getElementById('clearAllBtn');
+
+function getLocalMemos() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    } catch {
+        return [];
+    }
+}
+
+function saveLocalMemos(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    render();
+}
+
+function formatDate(ts) {
+    const d = new Date(ts);
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const h = d.getHours().toString().padStart(2, '0');
+    const min = d.getMinutes().toString().padStart(2, '0');
+    return `${m}-${day} ${h}:${min}`;
+}
+
+function render() {
+    const memos = getLocalMemos();
+    countText.innerText = `全部记录 (${memos.length})`;
+    memoList.innerHTML = '';
+
+    if (memos.length === 0) {
+        memoList.innerHTML = '<div class="empty-hint">暂无记录，输入内容点击保存即可。</div>';
+        return;
+    }
+
+    memos.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'memo-item';
+        card.innerHTML = `
+            <div class="memo-content">${escapeHtml(item.text)}</div>
+            <div class="memo-footer">
+                <span>${formatDate(item.timestamp)}</span>
+                <div class="memo-actions">
+                    <span class="action-text" onclick="copyMemo(${index})">复制</span>
+                    <span class="action-text delete" onclick="deleteMemo(${index})">删除</span>
+                </div>
+            </div>
+        `;
+        memoList.appendChild(card);
+    });
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+addBtn.addEventListener('click', () => {
+    const text = memoInput.value.trim();
+    if (!text) return;
+    const memos = getLocalMemos();
+    memos.unshift({ text, timestamp: Date.now() });
+    saveLocalMemos(memos);
+    memoInput.value = '';
+});
+
+window.deleteMemo = function(index) {
+    const memos = getLocalMemos();
+    memos.splice(index, 1);
+    saveLocalMemos(memos);
+};
+
+window.copyMemo = function(index) {
+    const memos = getLocalMemos();
+    if (memos[index]) {
+        navigator.clipboard.writeText(memos[index].text).then(() => alert('已复制到剪贴板'));
+    }
+};
+
+clearAllBtn.addEventListener('click', () => {
+    const memos = getLocalMemos();
+    if (memos.length === 0) return;
+    if (confirm('确定要清空本地所有记录吗？（云端备份不受影响）')) {
+        saveLocalMemos([]);
+    }
+});
+
+/* ==========================================================
+ * 3. GitHub Gist API 云同步引擎 (第 2 项实战核心)
+ * ========================================================== */
+const syncModal = document.getElementById('syncModal');
+const openSyncBtn = document.getElementById('openSyncBtn');
+const closeSyncBtn = document.getElementById('closeSyncBtn');
+const ghUser = document.getElementById('ghUser');
+const ghToken = document.getElementById('ghToken');
+const uploadBtn = document.getElementById('uploadBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const statusMsg = document.getElementById('statusMsg');
+
+// 读取本地已保存的凭据
+function loadConfig() {
+    try {
+        const cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || {};
+        if (cfg.user) ghUser.value = cfg.user;
+        if (cfg.token) ghToken.value = cfg.token;
+        return cfg;
+    } catch {
+        return {};
+    }
+}
+
+function saveConfig(gistId) {
+    const current = loadConfig();
+    const cfg = {
+        user: ghUser.value.trim(),
+        token: ghToken.value.trim(),
+        gistId: gistId || current.gistId || ''
+    };
+    localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+    return cfg;
+}
+
+openSyncBtn.addEventListener('click', () => {
+    loadConfig();
+    syncModal.style.display = 'flex';
+});
+
+closeSyncBtn.addEventListener('click', () => {
+    syncModal.style.display = 'none';
+});
+
+function setStatus(text, color = 'var(--text-secondary)') {
+    statusMsg.innerText = text;
+    statusMsg.style.color = color;
+}
+
+// 核心：上传备份到 GitHub Gist
+uploadBtn.addEventListener('click', async () => {
+    const token = ghToken.value.trim();
+    if (!token) {
+        setStatus('请先输入 Token 钥匙！', 'var(--danger)');
+        return;
+    }
+
+    const cfg = saveConfig();
+    setStatus('正在连接 GitHub 云端...', 'var(--accent)');
+
+    const localData = getLocalMemos();
+    const payload = {
+        description: "极简云速记备份数据 (PWA Auto Backup)",
+        public: false, // 私有备份，他人不可见
+        files: {
+            "memo-data.json": {
+                content: JSON.stringify(localData, null, 2)
+            }
+        }
+    };
+
+    try {
+        let url = 'https://api.github.com/gists';
+        let method = 'POST';
+
+        // 如果之前已经创建过 Gist，直接更新它
+        if (cfg.gistId) {
+            url = `https://api.github.com/gists/${cfg.gistId}`;
+            method = 'PATCH';
+        }
+
+        const res = await fetch(url, {
+            method: method,
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            }
+        }, payload);
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || '权限校验失败');
+        }
+
+        const data = await res.json();
+        saveConfig(data.id); // 永久记录该私有文件 ID
+        setStatus(`✅ 成功备份 ${localData.length} 条记录到云端！`, 'var(--success)');
+    } catch (e) {
+        setStatus(`❌ 备份失败: ${e.message}`, 'var(--danger)');
+    }
+});
+
+// 核心：从 GitHub Gist 下载还原
+downloadBtn.addEventListener('click', async () => {
+    const token = ghToken.value.trim();
+    if (!token) {
+        setStatus('请先输入 Token 钥匙！', 'var(--danger)');
+        return;
+    }
+
+    const cfg = saveConfig();
+    setStatus('正在从云端检索数据...', 'var(--accent)');
+
+    try {
+        let targetGistId = cfg.gistId;
+
+        // 如果本机没有记录 ID（例如在新手机/新浏览器上第一次同步），通过 API 列出用户的 Gist 查找
+        if (!targetGistId) {
+            const listRes = await fetch('https://api.github.com/gists', {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            if (!listRes.ok) throw new Error('Token 无效或已过期');
+            const gists = await listRes.json();
+            const matched = gists.find(g => g.files && g.files["memo-data.json"]);
+            if (matched) {
+                targetGistId = matched.id;
+                saveConfig(targetGistId);
+            } else {
+                throw new Error('云端暂无历史备份文件，请先点击【备份到云端】');
+            }
+        }
+
+        // 获取完整内容
+        const res = await fetch(`https://api.github.com/gists/${targetGistId}`, {
+            headers: { 'Authorization': `token ${token}` }
+        });
+
+        if (!res.ok) throw new Error('拉取失败，请检查网络或权限');
+
+        const gist = await res.json();
+        const file = gist.files["memo-data.json"];
+        if (!file || !file.content) throw new Error('未找到内容文件');
+
+        const remoteMemos = JSON.parse(file.content);
+        saveLocalMemos(remoteMemos);
+        setStatus(`✅ 成功恢复 ${remoteMemos.length} 条记录！`, 'var(--success)');
+    } catch (e) {
+        setStatus(`❌ 拉取失败: ${e.message}`, 'var(--danger)');
+    }
+});
+
+// 页面加载时初次渲染
+render();
+loadConfig();
+</script>
+</body>
+</html>
