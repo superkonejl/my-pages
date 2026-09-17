@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>S&P 500 定投雷达</title>
+
+  <!-- PWA / 移动端添加至桌面图标与全屏配置 -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="标普雷达">
+  <meta name="theme-color" content="#090d16">
+
+  <!-- 内联高清 SVG 应用图标 (暗金罗盘雷达设计) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23111827'/%3E%3Cstop offset='100%25' stop-color='%23030712'/%3E%3C/linearGradient%3E%3ClinearGradient id='chart' x1='0%25' y1='100%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='%230284c7'/%3E%3Cstop offset='100%25' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23bg)'/%3E%3Ccircle cx='256' cy='256' r='180' stroke='%231e293b' stroke-width='16' fill='none'/%3E%3Ccircle cx='256' cy='256' r='110' stroke='%23334155' stroke-width='8' fill='none' stroke-dasharray='12 12'/%3E%3Cpath d='M140 340 L220 280 L290 310 L380 170' stroke='url(%23chart)' stroke-width='28' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='380' cy='170' r='20' fill='%2338bdf8'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23111827'/%3E%3Cstop offset='100%25' stop-color='%23030712'/%3E%3C/linearGradient%3E%3ClinearGradient id='chart' x1='0%25' y1='100%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='%230284c7'/%3E%3Cstop offset='100%25' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='128' fill='url(%23bg)'/%3E%3Ccircle cx='256' cy='256' r='180' stroke='%231e293b' stroke-width='16' fill='none'/%3E%3Ccircle cx='256' cy='256' r='110' stroke='%23334155' stroke-width='8' fill='none' stroke-dasharray='12 12'/%3E%3Cpath d='M140 340 L220 280 L290 310 L380 170' stroke='url(%23chart)' stroke-width='28' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3Ccircle cx='380' cy='170' r='20' fill='%2338bdf8'/%3E%3C/svg%3E">
+
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #131b2e;
+      --card-inner: rgba(255, 255, 255, 0.03);
+      --border: #1f2d4a;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --orange: #f97316;
+      --red: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding-bottom: 24px;
+    }
+
+    /* 顶部应用标头 */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 4px 2px 4px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+    }
+
+    .brand-text h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-text p {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .status-pill {
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--green);
+      font-weight: 600;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    /* 核心数据卡片 */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.4);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .stat-tile {
+      background: var(--card-inner);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .stat-title {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-number {
+      font-size: 1.25rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-hero {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .drawdown-val {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 4px 0;
+    }
+
+    /* 策略决策盒 */
+    .strategy-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      border-left: 5px solid var(--green);
+      transition: border-color 0.3s ease;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .advice-head {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .advice-body {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: #f1f5f9;
+    }
+
+    /* 滑块微调与测试 */
+    .slider-box {
+      background: var(--card);
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+
+    .slider-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .slider-bar {
+      width: 100%;
+      height: 6px;
+      border-radius: 4px;
+      background: #334155;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .slider-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    /* 折叠面板（宏观硬指标与日历） */
+    .accordion {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .accordion-header {
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    .accordion-header:active {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .arrow-icon {
+      width: 16px;
+      height: 16px;
+      transition: transform 0.25s ease;
+      color: var(--muted);
+    }
+
+    .accordion.open .arrow-icon {
+      transform: rotate(180deg);
+    }
+
+    .accordion-body {
+      display: none;
+      padding: 0 16px 16px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .accordion.open .accordion-body {
+      display: block;
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 9px 0;
+      font-size: 0.8rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .data-row:last-child {
+      border-bottom: none;
+    }
+
+    .data-label {
+      color: var(--muted);
+    }
+
+    .data-val {
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    /* 按钮组 */
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    .btn-ghost {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 标头与 App 形象 -->
+    <header class="app-header">
+      <div class="brand">
+        <svg class="app-icon" viewBox="0 0 512 512">
+          <defs>
+            <linearGradient id="g_bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e293b"/>
+              <stop offset="100%" stop-color="#090d16"/>
+            </linearGradient>
+            <linearGradient id="g_line" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#0284c7"/>
+              <stop offset="100%" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+          <rect width="512" height="512" rx="110" fill="url(#g_bg)"/>
+          <circle cx="256" cy="256" r="160" stroke="#1f2d4a" stroke-width="16" fill="none"/>
+          <path d="M140 330 L220 270 L290 300 L370 180" stroke="url(#g_line)" stroke-width="32" stroke-linecap="round" fill="none"/>
+          <circle cx="370" cy="180" r="22" fill="#38bdf8"/>
+        </svg>
+        <div class="brand-text">
+          <h1>S&P 500 定投雷达</h1>
+          <p id="clock-text">十年复利养老模型</p>
+        </div>
+      </div>
+      <span class="status-pill">自动化待命</span>
+    </header>
+
+    <!-- 主指标面板 -->
+    <div class="card">
+      <div class="grid-2">
+        <div class="stat-tile">
+          <div class="stat-title">最新收盘价 (VOO)</div>
+          <div class="stat-number" id="box-price">$548.20</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-title">52 周最高点</div>
+          <div class="stat-number" id="box-high">$555.00</div>
+        </div>
+      </div>
+      <div class="stat-hero">
+        <div class="stat-title">高点回撤幅度 (Drawdown)</div>
+        <div class="drawdown-val" id="box-drawdown">-1.22%</div>
+        <div style="font-size: 0.72rem; color: var(--muted);" id="sub-notice">距离一级加仓阈值 (-8%) 尚有空间</div>
+      </div>
+    </div>
+
+    <!-- 策略输出面板 -->
+    <div class="strategy-card" id="strategy-box">
+      <div class="badge" id="strategy-badge">🟢 估值平稳 / 正常巡航</div>
+      <div class="advice-head">本期操作执行指令</div>
+      <div class="advice-body" id="strategy-text">
+        当前大盘处于常态运行区间。严格遵守 10 年长期纪律：保持<b>每月 5,000 元</b>基础机械扣款，闲置的蓄水池资金继续在新加坡存放享用无风险高息。
+      </div>
+    </div>
+
+    <!-- 折叠面板：宏观硬指标与关键日程 -->
+    <div class="accordion" id="macro-acc">
+      <div class="accordion-header" onclick="toggleAcc()">
+        <span>📊 市场宏观硬指标与财经日历</span>
+        <svg class="arrow-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </div>
+      <div class="accordion-body">
+        <div class="data-row">
+          <span class="data-label">VIX 恐慌指数</span>
+          <span class="data-val" id="macro-vix">15.4 (情绪平稳)</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">美联储基准利率</span>
+          <span class="data-val">4.75% ~ 5.00%</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">标普 500 席勒 PE</span>
+          <span class="data-val">34.8x (历史偏高分位)</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">下一次议息决议 (FOMC)</span>
+          <span class="data-val">2026年9月 / 待定</span>
+        </div>
+        <div style="margin-top: 10px; font-size: 0.72rem; color: var(--muted); line-height: 1.4;">
+          * 定投准则：宏观数据仅供参考水温，绝不作为暂停定投的猜顶踩底依据。
+        </div>
+      </div>
+    </div>
+
+    <!-- 模拟不同跌幅 -->
+    <div class="slider-box">
+      <div class="slider-head">
+        <span>拖动模拟大跌加仓指令</span>
+        <b id="slider-label" style="color: var(--accent);">-1.2%</b>
+      </div>
+      <input type="range" min="-35" max="0" step="0.5" value="-1.2" class="slider-bar" id="mock-range" oninput="handleSlide(this.value)">
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="resetMock()">恢复真实默认</button>
+      <button class="btn btn-primary" onclick="syncLive()">同步最新行情</button>
+    </div>
+  </div>
+
+  <script>
+    function toggleAcc() {
+      document.getElementById('macro-acc').classList.toggle('open');
+    }
+
+    function renderStrategy(dd) {
+      const box = document.getElementById('strategy-box');
+      const badge = document.getElementById('strategy-badge');
+      const text = document.getElementById('strategy-text');
+      const ddEl = document.getElementById('box-drawdown');
+      const notice = document.getElementById('sub-notice');
+
+      ddEl.innerText = `${Number(dd).toFixed(2)}%`;
+
+      if (dd > -8.0) {
+        box.style.borderLeftColor = 'var(--green)';
+        badge.style.background = 'rgba(16, 185, 129, 0.15)';
+        badge.style.color = 'var(--green)';
+        badge.innerText = '🟢 估值平稳 / 正常巡航';
+        text.innerHTML = '大盘处于常态运行区间。严格保持<b>每月 5,000 元</b>基础机械扣款，前三年沉淀的闲置资金继续在新加坡银行存放享用无风险高息。';
+        notice.innerText = '距离一级加仓阈值 (-8%) 尚有空间';
+      } else if (dd > -15.0) {
+        box.style.borderLeftColor = 'var(--yellow)';
+        badge.style.background = 'rgba(245, 158, 11, 0.15)';
+        badge.style.color = 'var(--yellow)';
+        badge.innerText = '🟡 一级回调（浅度打折）';
+        text.innerHTML = '出现良性技术回调（-8% ~ -15%）。建议启动<b>轻度加仓</b>：当期定投额度上浮 20%（例如投 6,000 元），加速拉低持仓均价。';
+        notice.innerText = '已进入轻度打折区间';
+      } else if (dd > -25.0) {
+        box.style.borderLeftColor = 'var(--orange)';
+        badge.style.background = 'rgba(249, 115, 22, 0.15)';
+        badge.style.color = 'var(--orange)';
+        badge.innerText = '🟠 二级回调（黄金击球区）';
+        text.innerHTML = '市场进入深度调整区间（-15% ~ -25%）！建议保持常规扣款的同时，动用蓄水池中的 <b>20%（约 8,000~10,000 元）</b>，进行第一轮主动单笔低吸！';
+        notice.innerText = '达到黄金买点，建议动用储备金加仓';
+      } else {
+        box.style.borderLeftColor = 'var(--red)';
+        badge.style.background = 'rgba(239, 68, 68, 0.15)';
+        badge.style.color = 'var(--red)';
+        badge.innerText = '🔴 三级极值（系统性熊市）';
+        text.innerHTML = '出现罕见暴跌或危机打折期（回撤 > 25%）！这是 10 年维度极佳的建仓良机，建议动用 <b>50% 蓄水池储备金</b> 大幅捡拾廉价筹码！';
+        notice.innerText = '危机级打折，启动全额储备金加仓';
+      }
+    }
+
+    function handleSlide(val) {
+      document.getElementById('slider-label').innerText = `${val}%`;
+      const high = 555.00;
+      const calcPrice = high * (1 + val / 100);
+      document.getElementById('box-price').innerText = `$${calcPrice.toFixed(2)}`;
+      renderStrategy(parseFloat(val));
+    }
+
+    function resetMock() {
+      document.getElementById('mock-range').value = -1.2;
+      document.getElementById('slider-label').innerText = '-1.2%';
+      document.getElementById('box-price').innerText = '$548.20';
+      document.getElementById('box-high').innerText = '$555.00';
+      renderStrategy(-1.2);
+    }
+
+    async function syncLive() {
+      const clock = document.getElementById('clock-text');
+      clock.innerText = '同步行情中...';
+      try {
+        const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/VOO?range=1y&interval=1d');
+        const data = await res.json();
+        const quotes = data.chart.result[0].indicators.quote[0].close.filter(p => p !== null);
+        const latest = quotes[quotes.length - 1];
+        const high = Math.max(...quotes);
+        const dd = ((latest - high) / high) * 100;
+
+        document.getElementById('box-price').innerText = `$${latest.toFixed(2)}`;
+        document.getElementById('box-high').innerText = `$${high.toFixed(2)}`;
+        document.getElementById('mock-range').value = dd.toFixed(1);
+        document.getElementById('slider-label').innerText = `${dd.toFixed(1)}%`;
+        renderStrategy(dd);
+        clock.innerText = `已同步: ${new Date().toLocaleTimeString()}`;
+      } catch (e) {
+        clock.innerText = '已切换本地预设水温';
+        resetMock();
+      }
+    }
+
+    // 初始化
+    renderStrategy(-1.2);
+  </script>
+</body>
+</html>
