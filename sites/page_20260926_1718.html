@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CodeLink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- 添加到主屏幕 / PWA -->
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIkNvZGVMaW5rIiwgInNob3J0X25hbWUiOiAiQ29kZUxpbmsiLCAiZGVzY3JpcHRpb24iOiAi5oqK5Luj56CB5Y+Y5oiQ5Y+v5YiG5Lqr55qE572R5Z2AIiwgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsICJzdGFydF91cmwiOiAiLiIsICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwODA4MGQiLCAidGhlbWVfY29sb3IiOiAiIzA4MDgwZCIsICJpY29ucyI6IFt7InNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQ2IzZzlJakFnTUNBMU1USWdOVEV5SWo0S1BHUmxabk0rUEd4cGJtVmhja2R5WVdScFpXNTBJR2xrUFNKbklpQjRNVDBpTUNJZ2VURTlJakFpSUhneVBTSXhJaUI1TWowaU1TSStDanh6ZEc5d0lHOW1abk5sZEQwaU1DSWdjM1J2Y0MxamIyeHZjajBpSXpBd1pUVm1aaUl2UGp4emRHOXdJRzltWm5ObGREMGlNU0lnYzNSdmNDMWpiMnh2Y2owaUkyWm1NbVprTUNJdlBnbzhMMnhwYm1WaGNrZHlZV1JwWlc1MFBqd3ZaR1ZtY3o0S1BISmxZM1FnZDJsa2RHZzlJalV4TWlJZ2FHVnBaMmgwUFNJMU1USWlJSEo0UFNJeE1UQWlJR1pwYkd3OUlpTXdPREE0TUdRaUx6NEtQSEpsWTNRZ2VEMGlNakFpSUhrOUlqSXdJaUIzYVdSMGFEMGlORGN5SWlCb1pXbG5hSFE5SWpRM01pSWdjbmc5SWprMklpQm1hV3hzUFNKdWIyNWxJaUJ6ZEhKdmEyVTlJblZ5YkNnalp5a2lJSE4wY205clpTMTNhV1IwYUQwaU1UUWlMejRLUEhSbGVIUWdlRDBpTWpVMklpQjVQU0l6TURBaUlHWnZiblF0Wm1GdGFXeDVQU0p0YjI1dmMzQmhZMlVpSUdadmJuUXRjMmw2WlQwaU1Ua3dJaUJtYjI1MExYZGxhV2RvZEQwaU56QXdJaUIwWlhoMExXRnVZMmh2Y2owaWJXbGtaR3hsSWlCbWFXeHNQU0oxY213b0kyY3BJajRtYkhRN0x5Wm5kRHM4TDNSbGVIUStDand2YzNablBnPT0iLCAic2l6ZXMiOiAiNTEyeDUxMiIsICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiLCAicHVycG9zZSI6ICJhbnkgbWFza2FibGUifV19">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzAwZTVmZiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI2ZmMmZkMCIvPgo8L2xpbmVhckdyYWRpZW50PjwvZGVmcz4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSIxMTAiIGZpbGw9IiMwODA4MGQiLz4KPHJlY3QgeD0iMjAiIHk9IjIwIiB3aWR0aD0iNDcyIiBoZWlnaHQ9IjQ3MiIgcng9Ijk2IiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZykiIHN0cm9rZS13aWR0aD0iMTQiLz4KPHRleHQgeD0iMjU2IiB5PSIzMDAiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTkwIiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ1cmwoI2cpIj4mbHQ7LyZndDs8L3RleHQ+Cjwvc3ZnPg==">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzAwZTVmZiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI2ZmMmZkMCIvPgo8L2xpbmVhckdyYWRpZW50PjwvZGVmcz4KPHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSIxMTAiIGZpbGw9IiMwODA4MGQiLz4KPHJlY3QgeD0iMjAiIHk9IjIwIiB3aWR0aD0iNDcyIiBoZWlnaHQ9IjQ3MiIgcng9Ijk2IiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjZykiIHN0cm9rZS13aWR0aD0iMTQiLz4KPHRleHQgeD0iMjU2IiB5PSIzMDAiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMTkwIiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ1cmwoI2cpIj4mbHQ7LyZndDs8L3RleHQ+Cjwvc3ZnPg==">
+<meta name="theme-color" content="#08080d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CodeLink">
+
+<style>
+:root{
+  --bg:#08080d; --surface:#121219; --surface2:#191922; --line:#25252f;
+  --text:#eef0f7; --sub:#8a8ba0; --cyan:#00e5ff; --mag:#ff2fd0;
+  --grad:linear-gradient(120deg,var(--cyan),var(--mag));
+  --danger:#ff5470; --radius:16px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  height:100%;margin:0;background:var(--bg);color:var(--text);
+  font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+code,pre,textarea,.mono{font-family:'JetBrains Mono',ui-monospace,Consolas,monospace}
+
+header{
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px calc(10px + env(safe-area-inset-top,0px)) 18px;
+  padding-top:calc(14px + env(safe-area-inset-top,0px));
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:19px;letter-spacing:.2px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--grad);box-shadow:0 0 12px var(--cyan)}
+.icon-btn{
+  width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--surface);
+  color:var(--text);display:flex;align-items:center;justify-content:center;font-size:17px;
+}
+.icon-btn:active{background:var(--surface2)}
+.hdr-actions{display:flex;gap:8px}
+
+.chips{flex:0 0 auto;display:flex;gap:8px;padding:12px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto;padding:7px 14px;border-radius:999px;border:1px solid var(--line);
+  background:var(--surface);color:var(--sub);font-size:13px;white-space:nowrap;
+}
+.chip.active{color:#000;background:var(--grad);border-color:transparent;font-weight:600}
+
+.segwrap{flex:0 0 auto;padding:0 16px 10px 16px}
+.seg{display:flex;background:var(--surface);border-radius:12px;padding:3px;border:1px solid var(--line)}
+.seg button{flex:1;padding:9px 0;border:none;background:transparent;color:var(--sub);border-radius:9px;font-family:inherit;font-size:14px;font-weight:600}
+.seg button.active{background:var(--surface2);color:var(--text)}
+
+main{flex:1 1 auto;min-height:0;padding:0 16px;display:flex;flex-direction:column}
+.pane{flex:1;min-height:0;border-radius:var(--radius);border:1px solid var(--line);background:var(--surface);overflow:hidden;position:relative}
+textarea{
+  width:100%;height:100%;resize:none;border:none;outline:none;background:transparent;color:var(--text);
+  padding:16px;font-size:14px;line-height:1.6;
+}
+.previewbox{width:100%;height:100%;overflow:auto;padding:16px;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+iframe.livepreview{width:100%;height:100%;border:none;background:#fff}
+.tok-kw{color:var(--mag)} .tok-str{color:#7cf5b0} .tok-com{color:var(--sub)} .tok-num{color:var(--cyan)} .tok-tag{color:var(--cyan)}
+
+footer{flex:0 0 auto;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px)) 16px}
+.genbtn{
+  width:100%;padding:15px 0;border:none;border-radius:14px;background:var(--grad);color:#050505;
+  font-family:inherit;font-weight:700;font-size:15px;box-shadow:0 8px 24px -8px rgba(0,229,255,.5);
+}
+.genbtn:disabled{opacity:.55}
+.result{
+  margin-bottom:10px;padding:12px 14px;border-radius:12px;background:var(--surface2);
+  border:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:13px;
+}
+.result a{color:var(--cyan);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.result button{flex:0 0 auto;border:none;background:var(--grad);color:#000;font-weight:700;font-size:12px;padding:7px 11px;border-radius:8px;font-family:inherit}
+.errbox{margin-bottom:10px;padding:12px 14px;border-radius:12px;background:rgba(255,84,112,.12);border:1px solid rgba(255,84,112,.4);color:#ff96a8;font-size:13px}
+
+.overlay{
+  position:fixed;inset:0;background:rgba(4,4,8,.7);backdrop-filter:blur(2px);z-index:20;
+  display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .18s;
+}
+.overlay.open{opacity:1;pointer-events:auto}
+.sheet{
+  width:100%;max-height:82vh;background:var(--surface);border-radius:22px 22px 0 0;border:1px solid var(--line);
+  padding:18px 18px calc(20px + env(safe-area-inset-bottom,0px)) 18px;overflow:auto;
+  transform:translateY(12px);transition:transform .18s;
+}
+.overlay.open .sheet{transform:translateY(0)}
+.sheet h2{margin:0 0 14px 0;font-size:17px}
+.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
+.field input{
+  width:100%;padding:12px 13px;border-radius:11px;border:1px solid var(--line);background:var(--surface2);
+  color:var(--text);font-family:inherit;font-size:14px;margin-bottom:14px;
+}
+.hint{font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:16px}
+.hint a{color:var(--cyan)}
+.rowbtns{display:flex;gap:10px}
+.btn{flex:1;padding:12px 0;border-radius:11px;border:1px solid var(--line);background:var(--surface2);color:var(--text);font-family:inherit;font-weight:600;font-size:14px}
+.btn.primary{background:var(--grad);color:#000;border:none}
+.btn.ghost{color:var(--danger);border-color:rgba(255,84,112,.4)}
+
+.hist-item{padding:12px 4px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.hist-item .top{display:flex;justify-content:space-between;font-size:12px;color:var(--sub)}
+.hist-item a{color:var(--text);font-size:14px;text-decoration:none;word-break:break-all}
+.hist-empty{color:var(--sub);font-size:13px;padding:24px 4px;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="dot"></span>CodeLink</div>
+  <div class="hdr-actions">
+    <button class="icon-btn" id="histBtn">🕘</button>
+    <button class="icon-btn" id="setBtn">⚙️</button>
+  </div>
+</header>
+
+<div class="chips" id="langChips"></div>
+
+<div class="segwrap">
+  <div class="seg">
+    <button id="segEdit" class="active">编辑</button>
+    <button id="segPrev">预览</button>
+  </div>
+</div>
+
+<main>
+  <div class="pane" id="editPane">
+    <textarea id="codeArea" spellcheck="false" placeholder="在这里粘贴或编写你的代码…"></textarea>
+  </div>
+  <div class="pane" id="prevPane" style="display:none"></div>
+</main>
+
+<footer>
+  <div id="resultSlot"></div>
+  <button class="genbtn" id="genBtn">🚀 生成网址</button>
+</footer>
+
+<div class="overlay" id="histOverlay">
+  <div class="sheet">
+    <h2>历史记录</h2>
+    <div id="histList"></div>
+    <div class="rowbtns" style="margin-top:12px">
+      <button class="btn" id="closeHist">关闭</button>
+      <button class="btn ghost" id="clearHist">清空记录</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="setOverlay">
+  <div class="sheet">
+    <h2>设置</h2>
+    <div class="field">
+      <label>GitHub Personal Access Token</label>
+      <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxx">
+    </div>
+    <div class="hint">用于调用 GitHub Gist API 生成链接，需要勾选 <b>gist</b> 权限。Token 仅保存在本设备浏览器本地，不会上传到其他地方。</div>
+    <div class="rowbtns">
+      <button class="btn ghost" id="clearToken">清除</button>
+      <button class="btn primary" id="saveToken">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LANGS=[
+  {id:'html',name:'HTML',ext:'index.html'},
+  {id:'javascript',name:'JavaScript',ext:'script.js'},
+  {id:'python',name:'Python',ext:'script.py'},
+  {id:'css',name:'CSS',ext:'style.css'},
+  {id:'json',name:'JSON',ext:'data.json'},
+  {id:'markdown',name:'Markdown',ext:'notes.md'},
+  {id:'plain',name:'纯文本',ext:'note.txt'},
+];
+let state={lang:'html', mode:'edit'};
+
+const $=s=>document.querySelector(s);
+const codeArea=$('#codeArea'), editPane=$('#editPane'), prevPane=$('#prevPane');
+const langChips=$('#langChips');
+
+LANGS.forEach(l=>{
+  const c=document.createElement('button');
+  c.className='chip'+(l.id===state.lang?' active':'');
+  c.textContent=l.name; c.dataset.id=l.id;
+  c.onclick=()=>{state.lang=l.id;
+    [...langChips.children].forEach(x=>x.classList.toggle('active',x===c));
+    renderPreview();
+  };
+  langChips.appendChild(c);
+});
+
+codeArea.value=localStorage.getItem('cl_draft')||'';
+codeArea.addEventListener('input',()=>{localStorage.setItem('cl_draft',codeArea.value); if(state.mode==='preview')renderPreview();});
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function highlight(code,lang){
+  let s=esc(code);
+  if(lang==='html'){
+    s=s.replace(/(&lt;\/?[a-zA-Z0-9-]+)/g,'<span class="tok-tag">$1</span>');
+    s=s.replace(/(&quot;.*?&quot;|"[^"]*")/g,'<span class="tok-str">$1</span>');
+  } else if(lang==='css'){
+    s=s.replace(/(\/\*[\s\S]*?\*\/)/g,'<span class="tok-com">$1</span>');
+    s=s.replace(/([.#]?[a-zA-Z-]+)(\s*\{)/g,'<span class="tok-tag">$1</span>$2');
+  } else if(lang==='json'){
+    s=s.replace(/(&quot;[^&]*?&quot;|"[^"]*")(\s*:)?/g,(m,g)=>g.includes(':')?`<span class="tok-tag">${m}</span>`:`<span class="tok-str">${m}</span>`);
+  } else if(lang==='markdown'){
+    s=s.replace(/^(#{1,6}.*)$/gm,'<span class="tok-kw">$1</span>');
+  } else {
+    const kws=['function','return','const','let','var','if','else','for','while','def','class','import','from','export','default','new','await','async','try','except','catch','print','True','False','None','true','false','null'];
+    s=s.replace(/\/\/.*$|#.*$/gm,'<span class="tok-com">$&</span>');
+    s=s.replace(/('.*?'|".*?")/g,'<span class="tok-str">$1</span>');
+    s=s.replace(new RegExp('\\b('+kws.join('|')+')\\b','g'),'<span class="tok-kw">$1</span>');
+    s=s.replace(/\b(\d+)\b/g,'<span class="tok-num">$1</span>');
+  }
+  return s;
+}
+
+function renderPreview(){
+  const code=codeArea.value;
+  if(state.lang==='html' && code.trim()){
+    prevPane.innerHTML='<iframe class="livepreview" sandbox="allow-scripts"></iframe>';
+    prevPane.querySelector('iframe').srcdoc=code;
+  } else {
+    prevPane.innerHTML='<div class="previewbox mono">'+(code.trim()?highlight(code,state.lang):'<span style="color:var(--sub)">暂无内容</span>')+'</div>';
+  }
+}
+
+$('#segEdit').onclick=()=>{state.mode='edit';$('#segEdit').classList.add('active');$('#segPrev').classList.remove('active');editPane.style.display='block';prevPane.style.display='none';};
+$('#segPrev').onclick=()=>{state.mode='preview';$('#segPrev').classList.add('active');$('#segEdit').classList.remove('active');editPane.style.display='none';prevPane.style.display='block';renderPreview();};
+
+// ---- history ----
+function getHistory(){try{return JSON.parse(localStorage.getItem('cl_history')||'[]')}catch(e){return []}}
+function saveHistory(h){localStorage.setItem('cl_history',JSON.stringify(h))}
+function addHistory(entry){const h=getHistory();h.unshift(entry);saveHistory(h.slice(0,100));}
+function renderHistory(){
+  const h=getHistory(); const list=$('#histList');
+  if(!h.length){list.innerHTML='<div class="hist-empty">还没有生成过链接</div>';return;}
+  list.innerHTML=h.map(e=>`<div class="hist-item">
+    <div class="top"><span>${e.lang}</span><span>${new Date(e.date).toLocaleString()}</span></div>
+    <a href="${e.url}" target="_blank" rel="noopener">${e.url}</a>
+  </div>`).join('');
+}
+
+// ---- overlays ----
+function openOverlay(id){$(id).classList.add('open')}
+function closeOverlay(id){$(id).classList.remove('open')}
+$('#histBtn').onclick=()=>{renderHistory();openOverlay('#histOverlay')};
+$('#closeHist').onclick=()=>closeOverlay('#histOverlay');
+$('#clearHist').onclick=()=>{saveHistory([]);renderHistory()};
+$('#setBtn').onclick=()=>{$('#tokenInput').value=localStorage.getItem('cl_token')||'';openOverlay('#setOverlay')};
+$('#saveToken').onclick=()=>{localStorage.setItem('cl_token',$('#tokenInput').value.trim());closeOverlay('#setOverlay')};
+$('#clearToken').onclick=()=>{localStorage.removeItem('cl_token');$('#tokenInput').value='';};
+[$('#histOverlay'),$('#setOverlay')].forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+
+// ---- generate ----
+$('#genBtn').onclick=async()=>{
+  const code=codeArea.value.trim();
+  const slot=$('#resultSlot'); slot.innerHTML='';
+  if(!code){slot.innerHTML='<div class="errbox">请先输入一些代码</div>';return;}
+  const token=localStorage.getItem('cl_token');
+  if(!token){slot.innerHTML='<div class="errbox">请先在设置中保存 GitHub Token</div>';openOverlay('#setOverlay');return;}
+  const btn=$('#genBtn'); btn.disabled=true; btn.textContent='生成中…';
+  const langObj=LANGS.find(l=>l.id===state.lang)||LANGS[0];
+  try{
+    const res=await fetch('https://api.github.com/gists',{
+      method:'POST',
+      headers:{'Authorization':'token '+token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      body:JSON.stringify({description:'Created with CodeLink',public:true,files:{[langObj.ext]:{content:code}}})
+    });
+    if(!res.ok){
+      if(res.status===401) throw new Error('Token 无效或已过期');
+      throw new Error('请求失败 (HTTP '+res.status+')');
+    }
+    const data=await res.json();
+    const url=data.html_url;
+    addHistory({url,lang:langObj.name,date:Date.now()});
+    slot.innerHTML=`<div class="result"><a href="${url}" target="_blank" rel="noopener">${url}</a><button id="copyBtn">复制</button></div>`;
+    $('#copyBtn').onclick=()=>{navigator.clipboard.writeText(url).then(()=>{$('#copyBtn').textContent='已复制';setTimeout(()=>$('#copyBtn').textContent='复制',1500)})};
+  }catch(e){
+    slot.innerHTML='<div class="errbox">生成失败：'+(e.message||'网络错误，请检查 Token 或网络')+'</div>';
+  }finally{
+    btn.disabled=false; btn.textContent='🚀 生成网址';
+  }
+};
+</script>
+</body>
+</html>
