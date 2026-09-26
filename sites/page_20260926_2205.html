@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>极影播放器 - ApexPlayer</title>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="极影播放">
+  <meta name="theme-color" content="#08080a">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 500: '#00F0FF', 600: '#00B8D4' },
+            dark: { 900: '#08080a', 800: '#121216', 700: '#1b1b22' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+    body, html {
+      background-color: #08080a;
+      color: #f1f5f9;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* 90度与270度虚拟旋转全屏核心样式 */
+    .player-rotate-90 {
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      width: 100vh !important;
+      height: 100vw !important;
+      transform: translate(-50%, -50%) rotate(90deg) !important;
+      transform-origin: center center !important;
+      z-index: 50;
+    }
+
+    .player-rotate-270 {
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      width: 100vh !important;
+      height: 100vw !important;
+      transform: translate(-50%, -50%) rotate(270deg) !important;
+      transform-origin: center center !important;
+      z-index: 50;
+    }
+
+    /* 操控条过渡淡入淡出 */
+    .fade-ui {
+      transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1), transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .fade-ui.hidden-controls {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+    }
+    #top-bar.hidden-controls {
+      transform: translateY(-8px);
+    }
+
+    /* 进度条与滑块美化 */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 9999px;
+      height: 4px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 14px;
+      width: 14px;
+      border-radius: 50%;
+      background: #00F0FF;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.8);
+      cursor: pointer;
+    }
+
+    /* 高斯模糊玻璃拟态质感 */
+    .glass-panel {
+      background: rgba(18, 18, 22, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* 安全区域适配 */
+    .pt-safe {
+      padding-top: max(1rem, env(safe-area-inset-top));
+    }
+    .pb-safe {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+  </style>
+</head>
+
+<body class="flex flex-col h-screen w-screen overflow-hidden bg-black select-none">
+
+  <div id="player-container" class="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
+    
+    <!-- 视频源与双渲染管线 (保证原生视频始终激活解码，不被休眠) -->
+    <video id="video-source" playsinline webkit-playsinline x5-video-player-type="h5" x5-playsinline class="w-full h-full object-contain pointer-events-none transition-[filter] duration-75"></video>
+    
+    <!-- SVG 硬件级实时锐化滤镜定义 (全机型兼容，零开销不黑屏) -->
+    <svg id="svg-sharpen-def" class="absolute w-0 h-0 pointer-events-none opacity-0" aria-hidden="true">
+      <filter id="svg-sharpen-filter" color-interpolation-filters="sRGB">
+        <feConvolveMatrix id="sharpen-matrix" order="3" preserveAlpha="true" kernelMatrix="0 0 0 0 1 0 0 0 0" />
+      </filter>
+    </svg>
+
+    <!-- 软件亮度调节遮罩层 -->
+    <div id="brightness-overlay" class="absolute inset-0 bg-black pointer-events-none transition-opacity duration-75 z-15" style="opacity: 0;"></div>
+
+    <div id="gesture-surface" class="absolute inset-0 z-20 touch-none flex items-center justify-center">
+      <!-- 居中手势反馈 HUD -->
+      <div id="gesture-hud" class="hidden transform scale-95 transition-all duration-200 glass-panel px-6 py-4 rounded-2xl flex flex-col items-center gap-2 shadow-2xl border border-white/10 z-30">
+        <div id="hud-icon" class="text-brand-500 w-8 h-8 flex items-center justify-center"></div>
+        <div id="hud-text" class="text-sm font-semibold tracking-wider text-slate-200">50%</div>
+        <div class="w-28 h-1.5 bg-white/20 rounded-full overflow-hidden mt-1">
+          <div id="hud-bar" class="h-full bg-brand-500 rounded-full transition-all duration-75" style="width: 50%;"></div>
+        </div>
+      </div>
+
+      <!-- 2.0x 极速长按指示徽章 -->
+      <div id="speed-badge" class="hidden absolute top-16 glass-panel px-4 py-1.5 rounded-full flex items-center gap-2 text-xs font-bold text-amber-400 border border-amber-500/30 animate-pulse z-30">
+        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M13 2.05v3.03c3.39.49 6 3.39 6 6.92 0 .9-.18 1.75-.48 2.54l2.6 1.53c.56-1.24.88-2.62.88-4.07 0-5.18-3.95-9.45-9-9.95zM12 19c-3.87 0-7-3.13-7-7 0-3.53 2.61-6.43 6-6.92V2.05c-5.06.5-9 4.76-9 9.95 0 5.52 4.47 10 9.99 10 3.31 0 6.24-1.61 8.04-4.09l-2.45-1.44C16.27 18.06 14.28 19 12 19z"/></svg>
+        <span>2.0X 极速播放中</span>
+      </div>
+
+      <!-- 画质增强分屏对比线 -->
+      <div id="split-compare-container" class="hidden absolute inset-0 pointer-events-none z-25">
+        <div id="split-line" class="absolute top-0 bottom-0 w-0.5 bg-brand-500 shadow-[0_0_12px_#00F0FF]" style="left: 50%;">
+          <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-dark-900 border border-brand-500 flex items-center justify-center text-[10px] text-brand-500 shadow-lg">
+            ⇄
+          </div>
+          <span class="absolute top-8 right-3 text-[11px] font-mono tracking-widest text-brand-500 bg-black/60 px-2 py-0.5 rounded backdrop-blur">AI增强</span>
+          <span class="absolute top-8 left-3 text-[11px] font-mono tracking-widest text-slate-400 bg-black/60 px-2 py-0.5 rounded backdrop-blur">原始画质</span>
+        </div>
+      </div>
+    </div>
+
+    <header id="top-bar" class="fade-ui absolute top-0 left-0 right-0 z-40 p-4 pt-safe flex items-center justify-between bg-gradient-to-b from-black/85 via-black/40 to-transparent">
+      <div class="flex items-center gap-3">
+        <button id="btn-back" class="p-2 rounded-full glass-panel text-slate-300 hover:text-white active:scale-95 transition" title="返回主界面">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div>
+          <h1 id="video-filename" class="text-xs sm:text-sm font-medium text-slate-200 line-clamp-1 max-w-[150px] sm:max-w-xs">未加载视频</h1>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span id="ai-active-pill" class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-brand-500/20 text-brand-500 border border-brand-500/30">标准画质</span>
+            <span id="video-res-pill" class="text-[10px] text-slate-400 font-mono">0x0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- 90度一键旋转全屏按钮 -->
+        <button id="btn-rotate" title="旋转 90 度" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full glass-panel text-xs text-brand-500 border border-brand-500/30 active:scale-95 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span id="rotate-label">横屏 90°</span>
+        </button>
+
+        <!-- 画质增强菜单按钮 -->
+        <button id="btn-quality-toggle" class="p-2 rounded-full glass-panel text-slate-200 active:scale-95 transition relative" title="画质增强">
+          <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-brand-500 rounded-full animate-ping"></span>
+        </button>
+
+        <!-- 添加到主屏幕说明弹窗按钮 -->
+        <button id="btn-pwa-guide" title="添加到主屏幕" class="p-2 rounded-full glass-panel text-slate-300 hover:text-white active:scale-95 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <footer id="bottom-bar" class="fade-ui absolute bottom-0 left-0 right-0 z-40 p-4 pb-safe bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col gap-2">
+      <!-- 进度条 -->
+      <div class="relative w-full flex items-center group py-1">
+        <input id="progress-bar" type="range" min="0" max="100" value="0" step="0.1" class="w-full cursor-pointer z-10">
+      </div>
+
+      <div class="flex items-center justify-between">
+        <!-- 播放/暂停与时间显示 -->
+        <div class="flex items-center gap-3">
+          <button id="btn-play-pause" class="w-10 h-10 rounded-full bg-brand-500 text-black flex items-center justify-center font-bold active:scale-90 transition shadow-[0_0_15px_rgba(0,240,255,0.4)]">
+            <svg id="icon-play" class="w-5 h-5 ml-0.5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icon-pause" class="w-5 h-5 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+          <div class="text-xs font-mono tracking-tight text-slate-300">
+            <span id="current-time">00:00</span>
+            <span class="text-slate-600">/</span>
+            <span id="duration-time" class="text-slate-500">00:00</span>
+          </div>
+        </div>
+
+        <!-- 右侧控制组 -->
+        <div class="flex items-center gap-2">
+          <!-- 播放倍速 -->
+          <button id="btn-speed" class="px-2.5 py-1 rounded-full glass-panel text-xs font-mono text-slate-300 active:scale-95 transition">
+            1.0x
+          </button>
+
+          <!-- 画面填充模式 -->
+          <button id="btn-aspect" class="p-2 rounded-full glass-panel text-slate-300 active:scale-95 transition" title="画面比例">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+          </button>
+
+          <!-- 底部选片按键 (直接覆盖透明 input 确保手机端百分百响应触发) -->
+          <div class="relative overflow-hidden rounded-full bg-white/10 hover:bg-white/20 border border-white/15 px-3 py-1.5 text-xs text-white font-medium flex items-center gap-1.5 active:scale-95 transition cursor-pointer">
+            <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>换片</span>
+            <input id="file-input-bottom" type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20">
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <div id="empty-state" class="absolute inset-0 z-50 flex flex-col items-center justify-center p-6 bg-dark-900/98 backdrop-blur-md">
+      <div class="max-w-sm w-full glass-panel p-6 rounded-3xl border border-white/10 flex flex-col items-center text-center shadow-2xl">
+        <div class="w-16 h-16 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center mb-4 text-brand-500">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        
+        <h2 class="text-lg font-bold text-white mb-1">极影本地播放器</h2>
+        <p class="text-xs text-slate-400 mb-6 leading-relaxed">
+          纯本地硬件解码 · CAS 智能锐化 · 90° 旋转全屏 · 全手势微调
+        </p>
+
+        <div class="w-full flex flex-col gap-3">
+          <!-- 采用透明全尺寸覆盖 Input，确保 iOS Safari 与各类安卓手机点击 100% 呼出文件选择 -->
+          <div class="relative overflow-hidden w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 text-black font-semibold text-sm shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:opacity-95 active:scale-[0.98] transition flex items-center justify-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            <span>选择手机本地视频</span>
+            <input id="main-file-input" type="file" accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20">
+          </div>
+
+          <!-- 本地零网络演示视频生成器，不依赖任何外部 Google CDN，即点即看 -->
+          <button id="btn-load-demo" class="w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 font-medium active:scale-[0.98] transition flex items-center justify-center gap-2">
+            <span>✨ 立即生成高清演示动画体验</span>
+          </button>
+        </div>
+
+        <div class="mt-6 flex items-center justify-center gap-4 text-[11px] text-slate-500 font-mono">
+          <span>无需联网</span> • <span>不传服务器</span> • <span>安全省电</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 画质调整弹窗 -->
+    <div id="quality-modal" class="hidden absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div class="w-full sm:max-w-md glass-panel p-5 rounded-t-3xl sm:rounded-3xl border border-white/10 shadow-2xl flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+        <div class="flex items-center justify-between pb-3 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></div>
+            <h3 class="text-sm font-bold text-white tracking-wide">画质色彩与清晰度微调</h3>
+          </div>
+          <button id="btn-close-quality" class="text-slate-400 hover:text-white p-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- 常用风格一键预设 -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-[11px] text-slate-400 font-medium">常用风格预设</label>
+          <div class="grid grid-cols-4 gap-1.5">
+            <button id="preset-default" class="preset-btn py-2 px-1 rounded-xl bg-brand-500/20 text-brand-500 border border-brand-500/40 text-xs font-semibold active:scale-95 transition text-center">标准原画</button>
+            <button id="preset-clear" class="preset-btn py-2 px-1 rounded-xl bg-white/5 text-slate-300 border border-white/10 text-xs font-semibold active:scale-95 transition text-center">通透超清</button>
+            <button id="preset-anime" class="preset-btn py-2 px-1 rounded-xl bg-white/5 text-slate-300 border border-white/10 text-xs font-semibold active:scale-95 transition text-center">动漫艳丽</button>
+            <button id="preset-cinema" class="preset-btn py-2 px-1 rounded-xl bg-white/5 text-slate-300 border border-white/10 text-xs font-semibold active:scale-95 transition text-center">影院通透</button>
+          </div>
+        </div>
+
+        <!-- 自定义调节滑块组 -->
+        <div class="flex flex-col gap-3.5 pt-1">
+          <!-- 锐化清晰度 -->
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-300 flex items-center gap-1.5">
+                <span>清晰度 (锐化)</span>
+                <span class="text-[10px] text-slate-500">消除边缘发虚</span>
+              </span>
+              <span id="val-sharpen" class="font-mono text-brand-500 font-bold">0%</span>
+            </div>
+            <input id="slider-sharpen" type="range" min="0" max="100" value="0" step="1">
+          </div>
+
+          <!-- 对比度 -->
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-300 flex items-center gap-1.5">
+                <span>画面对比度</span>
+                <span class="text-[10px] text-slate-500">明暗层次更分明</span>
+              </span>
+              <span id="val-contrast" class="font-mono text-brand-500 font-bold">100%</span>
+            </div>
+            <input id="slider-contrast" type="range" min="60" max="180" value="100" step="1">
+          </div>
+
+          <!-- 鲜艳度/饱和度 -->
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-300 flex items-center gap-1.5">
+                <span>色彩鲜艳度</span>
+                <span class="text-[10px] text-slate-500">人物更透亮/色彩更浓</span>
+              </span>
+              <span id="val-saturate" class="font-mono text-brand-500 font-bold">100%</span>
+            </div>
+            <input id="slider-saturate" type="range" min="50" max="220" value="100" step="1">
+          </div>
+
+          <!-- 明亮度 -->
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-slate-300 flex items-center gap-1.5">
+                <span>画面基底亮度</span>
+                <span class="text-[10px] text-slate-500">提亮暗部细节</span>
+              </span>
+              <span id="val-brightness" class="font-mono text-brand-500 font-bold">100%</span>
+            </div>
+            <input id="slider-brightness" type="range" min="60" max="150" value="100" step="1">
+          </div>
+        </div>
+
+        <!-- 底部重置操作 -->
+        <div class="flex items-center justify-between pt-2 border-t border-white/10">
+          <button id="btn-reset-filters" class="text-xs text-slate-400 hover:text-rose-400 active:scale-95 transition flex items-center gap-1 py-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span>重置为默认值</span>
+          </button>
+          <button id="btn-finish-quality" class="px-4 py-1.5 rounded-full bg-brand-500 text-black text-xs font-bold active:scale-95 transition">
+            完成
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PWA 主屏幕添加指引弹窗 -->
+    <div id="pwa-modal" class="hidden absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="w-full max-w-sm glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col gap-4 text-center">
+        <div class="w-12 h-12 rounded-full bg-brand-500/20 text-brand-500 flex items-center justify-center mx-auto">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">将极影播放器添加到主屏幕</h3>
+          <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            添加到手机桌面后，可作为独立独立 App 运行，享受沉浸式影院无黑边体验。
+          </p>
+        </div>
+
+        <div class="bg-white/5 p-4 rounded-2xl text-left flex flex-col gap-2.5 text-xs text-slate-300 border border-white/5">
+          <div class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-brand-500/20 text-brand-500 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
+            <span><strong>iOS (Safari)：</strong>点击底部菜单栏的「分享」按钮，滑动选择<strong>「添加到主屏幕」</strong>。</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="w-5 h-5 rounded-full bg-brand-500/20 text-brand-500 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
+            <span><strong>Android (Chrome/Edge)：</strong>点击右上角「三个点」菜单，选择<strong>「添加到主屏幕」</strong>或「安装应用」。</span>
+          </div>
+        </div>
+
+        <button id="btn-close-pwa" class="w-full py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold active:scale-95 transition">
+          我知道了
+        </button>
+      </div>
+    </div>
+
+    <!-- 简易消息提示浮层 -->
+    <div id="toast-msg" class="hidden absolute top-12 left-1/2 -translate-x-1/2 z-50 glass-panel px-4 py-2 rounded-full text-xs text-brand-500 border border-brand-500/40 shadow-xl transition-all pointer-events-none">
+      提示信息
+    </div>
+
+  </div>
+
+  <script>
+    class ApexPlayer {
+      constructor() {
+        this.video = document.getElementById('video-source');
+        this.container = document.getElementById('player-container');
+        
+        // 旋转与布局状态
+        this.rotationAngle = 0; // 0, 90, 270
+        this.aspectMode = 0;    // 0: contain, 1: cover, 2: fill
+        this.userBrightness = 1.0;
+        this.playbackSpeeds = [0.75, 1.0, 1.25, 1.5, 2.0];
+        this.speedIndex = 1;
+        this.controlsTimeout = null;
+        this.isScrubbing = false;
+
+        // 画质参数 (百分比)
+        this.filterSharpen = 0;      // 0 ~ 100
+        this.filterContrast = 100;   // 60 ~ 180
+        this.filterSaturate = 100;   // 50 ~ 220
+        this.filterBrightness = 100; // 60 ~ 150
+
+        this.bindEvents();
+        this.initGestures();
+        this.setupPWA();
+        this.applyFilters();
+      }
+
+      applyFilters() {
+        const matrix = document.getElementById('sharpen-matrix');
+        
+        // 动态卷积核锐化计算: 保持各权重之和恒等于 1，不改变整体明度
+        if (this.filterSharpen > 0) {
+          const s = (this.filterSharpen / 100) * 0.75;
+          const center = (1.0 + 4.0 * s).toFixed(3);
+          const edge = (-s).toFixed(3);
+          matrix.setAttribute('kernelMatrix', `0 ${edge} 0 ${edge} ${center} ${edge} 0 ${edge} 0`);
+        } else {
+          matrix.setAttribute('kernelMatrix', '0 0 0 0 1 0 0 0 0');
+        }
+
+        // 拼接 CSS 硬件加速滤镜序列
+        const sharpenFilter = this.filterSharpen > 0 ? 'url(#svg-sharpen-filter) ' : '';
+        this.video.style.filter = `${sharpenFilter}contrast(${this.filterContrast}%) saturate(${this.filterSaturate}%) brightness(${this.filterBrightness}%)`;
+
+        // 更新 UI 标签
+        const isDefault = (this.filterSharpen === 0 && this.filterContrast === 100 && this.filterSaturate === 100 && this.filterBrightness === 100);
+        document.getElementById('ai-active-pill').textContent = isDefault ? '标准原画' : '已增强画质';
+        document.getElementById('ai-active-pill').className = isDefault
+          ? 'text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/10 text-slate-300 border border-white/20'
+          : 'text-[10px] font-mono px-1.5 py-0.2 rounded bg-brand-500/20 text-brand-500 border border-brand-500/40 font-bold';
+      }
+
+      setFilters(sharpen, contrast, saturate, brightness) {
+        this.filterSharpen = sharpen;
+        this.filterContrast = contrast;
+        this.filterSaturate = saturate;
+        this.filterBrightness = brightness;
+
+        document.getElementById('slider-sharpen').value = sharpen;
+        document.getElementById('val-sharpen').textContent = `${sharpen}%`;
+        document.getElementById('slider-contrast').value = contrast;
+        document.getElementById('val-contrast').textContent = `${contrast}%`;
+        document.getElementById('slider-saturate').value = saturate;
+        document.getElementById('val-saturate').textContent = `${saturate}%`;
+        document.getElementById('slider-brightness').value = brightness;
+        document.getElementById('val-brightness').textContent = `${brightness}%`;
+
+        this.applyFilters();
+      }
+
+      getVisualPoint(touch) {
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        const dx = touch.clientX - cx;
+        const dy = touch.clientY - cy;
+
+        // 应用逆旋转矩阵:
+        // 当容器旋转 angle 度时，屏幕坐标差值 (dx, dy) 映射回容器内部坐标 (lx, ly)
+        const rad = (this.rotationAngle * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        const lx = dx * cos + dy * sin;
+        const ly = -dx * sin + dy * cos;
+
+        const isRotated = (this.rotationAngle === 90 || this.rotationAngle === 270);
+        const visualWidth = isRotated ? window.innerHeight : window.innerWidth;
+        const visualHeight = isRotated ? window.innerWidth : window.innerHeight;
+
+        return {
+          x: lx + visualWidth / 2,
+          y: ly + visualHeight / 2,
+          width: visualWidth,
+          height: visualHeight
+        };
+      }
+
+      initGestures() {
+        const surface = document.getElementById('gesture-surface');
+        let startX = 0;
+        let startY = 0;
+        let startTime = 0;
+        let startVolume = 1;
+        let startBrightness = 1;
+        let containerW = 0;
+        let containerH = 0;
+        let isMoving = false;
+        let gestureType = null;
+        let lastTapTime = 0;
+        let longPressTimer = null;
+
+        surface.addEventListener('touchstart', (e) => {
+          if (e.touches.length !== 1) return;
+          const touch = e.touches[0];
+          
+          // 获取基于当前横/竖屏视口的真实空间坐标
+          const pt = this.getVisualPoint(touch);
+          startX = pt.x;
+          startY = pt.y;
+          containerW = pt.width;
+          containerH = pt.height;
+
+          startTime = this.video.currentTime;
+          startVolume = this.video.volume;
+          startBrightness = this.userBrightness;
+          isMoving = false;
+          gestureType = null;
+
+          // 长按 2.0x 极速快进
+          longPressTimer = setTimeout(() => {
+            if (!isMoving && !this.video.paused) {
+              this.video.playbackRate = 2.0;
+              document.getElementById('speed-badge').classList.remove('hidden');
+            }
+          }, 450);
+        }, { passive: false });
+
+        surface.addEventListener('touchmove', (e) => {
+          if (e.touches.length !== 1) return;
+          const touch = e.touches[0];
+          const pt = this.getVisualPoint(touch);
+
+          // 基于横屏视野的水平 delta 与垂直 delta（向上为正）
+          const deltaX = pt.x - startX;
+          const deltaY = startY - pt.y;
+
+          if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+            isMoving = true;
+            clearTimeout(longPressTimer);
+          }
+
+          if (!gestureType && isMoving) {
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+              gestureType = 'progress'; // 横向滑动：进度快进/快退
+            } else {
+              // 纵向滑动：判断位于横屏画面的左侧还是右侧
+              if (startX < containerW * 0.5) {
+                gestureType = 'brightness'; // 左侧调亮度
+              } else {
+                gestureType = 'volume';     // 右侧调音量
+              }
+            }
+          }
+
+          if (gestureType === 'progress' && this.video.duration) {
+            // 水平滑动跨度计算（滑动 260px 对应 60 秒）
+            const seekDelta = (deltaX / 260) * 60;
+            const target = Math.max(0, Math.min(this.video.duration, startTime + seekDelta));
+            const sign = seekDelta >= 0 ? '+' : '';
+            this.showHud('progress', `${sign}${Math.round(seekDelta)}s [${this.formatTime(target)}]`, target / this.video.duration);
+            this.pendingSeek = target;
+          } else if (gestureType === 'volume') {
+            const vDelta = deltaY / 180;
+            const newVol = Math.max(0, Math.min(1.0, startVolume + vDelta));
+            this.video.volume = newVol;
+            const pct = Math.round(newVol * 100);
+            this.showHud('volume', `音量 ${pct}%`, newVol);
+          } else if (gestureType === 'brightness') {
+            const bDelta = deltaY / 180;
+            this.userBrightness = Math.max(0.1, Math.min(1.0, startBrightness + bDelta));
+            document.getElementById('brightness-overlay').style.opacity = (1.0 - this.userBrightness) * 0.88;
+            this.showHud('brightness', `亮度 ${Math.round(this.userBrightness * 100)}%`, this.userBrightness);
+          }
+        }, { passive: false });
+
+        surface.addEventListener('touchend', () => {
+          clearTimeout(longPressTimer);
+          if (!document.getElementById('speed-badge').classList.contains('hidden')) {
+            this.video.playbackRate = this.playbackSpeeds[this.speedIndex];
+            document.getElementById('speed-badge').classList.add('hidden');
+          }
+
+          if (gestureType === 'progress' && this.pendingSeek !== undefined) {
+            this.video.currentTime = this.pendingSeek;
+            this.pendingSeek = undefined;
+          }
+
+          this.hideHud();
+
+          if (!isMoving) {
+            const now = Date.now();
+            if (now - lastTapTime < 300) {
+              // 双击播放 / 暂停
+              this.togglePlay();
+              this.triggerControls();
+            } else {
+              // 单击显示 / 隐藏控制条
+              this.toggleControls();
+            }
+            lastTapTime = now;
+          }
+        });
+      }
+
+      bindEvents() {
+        const video = this.video;
+        const mainInput = document.getElementById('main-file-input');
+        const bottomInput = document.getElementById('file-input-bottom');
+        const btnPlay = document.getElementById('btn-play-pause');
+        const progressBar = document.getElementById('progress-bar');
+        const btnRotate = document.getElementById('btn-rotate');
+        const btnSpeed = document.getElementById('btn-speed');
+        const btnAspect = document.getElementById('btn-aspect');
+        const btnQuality = document.getElementById('btn-quality-toggle');
+        const btnCloseQuality = document.getElementById('btn-close-quality');
+        const btnFinishQuality = document.getElementById('btn-finish-quality');
+        const qualityModal = document.getElementById('quality-modal');
+        const btnPwa = document.getElementById('btn-pwa-guide');
+        const btnClosePwa = document.getElementById('btn-close-pwa');
+        const pwaModal = document.getElementById('pwa-modal');
+
+        // 文件载入
+        const handleFileSelect = (file) => {
+          if (!file) return;
+          try {
+            const url = URL.createObjectURL(file);
+            video.src = url;
+            document.getElementById('video-filename').textContent = file.name;
+            document.getElementById('empty-state').classList.add('hidden');
+            video.load();
+            video.play().catch(() => {});
+            this.showToast('已加载视频: ' + file.name);
+            this.triggerControls();
+          } catch (err) {
+            this.showToast('加载视频失败: ' + err.message);
+          }
+        };
+
+        mainInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) handleFileSelect(e.target.files[0]);
+        });
+        bottomInput.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files[0]) handleFileSelect(e.target.files[0]);
+        });
+
+        // 离线演示动画生成
+        document.getElementById('btn-load-demo').addEventListener('click', () => {
+          this.createProceduralDemoVideo();
+        });
+
+        btnPlay.addEventListener('click', () => this.togglePlay());
+        video.addEventListener('play', () => {
+          document.getElementById('icon-play').classList.add('hidden');
+          document.getElementById('icon-pause').classList.remove('hidden');
+        });
+        video.addEventListener('pause', () => {
+          document.getElementById('icon-play').classList.remove('hidden');
+          document.getElementById('icon-pause').classList.add('hidden');
+        });
+
+        video.addEventListener('loadedmetadata', () => {
+          document.getElementById('duration-time').textContent = this.formatTime(video.duration);
+          document.getElementById('video-res-pill').textContent = `${video.videoWidth}×${video.videoHeight}`;
+          this.resizeDisplay();
+        });
+
+        video.addEventListener('timeupdate', () => {
+          if (!this.isScrubbing && video.duration) {
+            const pct = (video.currentTime / video.duration) * 100 || 0;
+            progressBar.value = pct;
+            document.getElementById('current-time').textContent = this.formatTime(video.currentTime);
+          }
+        });
+
+        progressBar.addEventListener('input', (e) => {
+          this.isScrubbing = true;
+          if (video.duration) {
+            const target = (e.target.value / 100) * video.duration;
+            document.getElementById('current-time').textContent = this.formatTime(target);
+          }
+        });
+
+        progressBar.addEventListener('change', (e) => {
+          if (video.duration) {
+            video.currentTime = (e.target.value / 100) * video.duration;
+          }
+          this.isScrubbing = false;
+        });
+
+        // 90° / 270° 旋转
+        btnRotate.addEventListener('click', () => this.cycleRotation());
+
+        // 倍速
+        btnSpeed.addEventListener('click', () => {
+          this.speedIndex = (this.speedIndex + 1) % this.playbackSpeeds.length;
+          const s = this.playbackSpeeds[this.speedIndex];
+          video.playbackRate = s;
+          btnSpeed.textContent = `${s}x`;
+          this.showHud('speed', `${s}X 倍速`, s / 2.0);
+        });
+
+        // 画面比例
+        btnAspect.addEventListener('click', () => {
+          this.aspectMode = (this.aspectMode + 1) % 3;
+          const modes = ['适应 (Fit)', '铺满 (Cover)', '拉伸 (Fill)'];
+          this.resizeDisplay();
+          this.showHud('aspect', modes[this.aspectMode], 1);
+        });
+
+        // 画质弹窗开关
+        btnQuality.addEventListener('click', () => qualityModal.classList.remove('hidden'));
+        btnCloseQuality.addEventListener('click', () => qualityModal.classList.add('hidden'));
+        btnFinishQuality.addEventListener('click', () => qualityModal.classList.add('hidden'));
+
+        // 四项画质滑块监听
+        const sSharpen = document.getElementById('slider-sharpen');
+        const sContrast = document.getElementById('slider-contrast');
+        const sSaturate = document.getElementById('slider-saturate');
+        const sBrightness = document.getElementById('slider-brightness');
+
+        sSharpen.addEventListener('input', (e) => {
+          this.filterSharpen = parseInt(e.target.value);
+          document.getElementById('val-sharpen').textContent = `${this.filterSharpen}%`;
+          this.applyFilters();
+        });
+
+        sContrast.addEventListener('input', (e) => {
+          this.filterContrast = parseInt(e.target.value);
+          document.getElementById('val-contrast').textContent = `${this.filterContrast}%`;
+          this.applyFilters();
+        });
+
+        sSaturate.addEventListener('input', (e) => {
+          this.filterSaturate = parseInt(e.target.value);
+          document.getElementById('val-saturate').textContent = `${this.filterSaturate}%`;
+          this.applyFilters();
+        });
+
+        sBrightness.addEventListener('input', (e) => {
+          this.filterBrightness = parseInt(e.target.value);
+          document.getElementById('val-brightness').textContent = `${this.filterBrightness}%`;
+          this.applyFilters();
+        });
+
+        // 快捷风格预设
+        document.getElementById('preset-default').addEventListener('click', () => {
+          this.setFilters(0, 100, 100, 100);
+          this.showToast('已切换为标准原画');
+        });
+        document.getElementById('preset-clear').addEventListener('click', () => {
+          this.setFilters(50, 115, 115, 102);
+          this.showToast('已开启通透超清预设');
+        });
+        document.getElementById('preset-anime').addEventListener('click', () => {
+          this.setFilters(45, 110, 145, 105);
+          this.showToast('已开启动漫色彩强化');
+        });
+        document.getElementById('preset-cinema').addEventListener('click', () => {
+          this.setFilters(35, 125, 110, 95);
+          this.showToast('已开启影院沉浸色彩');
+        });
+        document.getElementById('btn-reset-filters').addEventListener('click', () => {
+          this.setFilters(0, 100, 100, 100);
+          this.showToast('画质已重置为默认');
+        });
+
+        // PWA 弹窗与返回
+        btnPwa.addEventListener('click', () => pwaModal.classList.remove('hidden'));
+        btnClosePwa.addEventListener('click', () => pwaModal.classList.add('hidden'));
+
+        document.getElementById('btn-back').addEventListener('click', () => {
+          video.pause();
+          document.getElementById('empty-state').classList.remove('hidden');
+        });
+
+        window.addEventListener('resize', () => this.resizeDisplay());
+        window.addEventListener('orientationchange', () => {
+          setTimeout(() => this.resizeDisplay(), 200);
+        });
+      }
+
+      cycleRotation() {
+        if (this.rotationAngle === 0) {
+          this.rotationAngle = 90;
+        } else if (this.rotationAngle === 90) {
+          this.rotationAngle = 270;
+        } else {
+          this.rotationAngle = 0;
+        }
+
+        this.container.classList.remove('player-rotate-90', 'player-rotate-270');
+        const rotateLabel = document.getElementById('rotate-label');
+
+        if (this.rotationAngle === 90) {
+          this.container.classList.add('player-rotate-90');
+          rotateLabel.textContent = '270° 反向';
+          this.showToast('已旋转 90° 横屏 (手势已同步横置)');
+        } else if (this.rotationAngle === 270) {
+          this.container.classList.add('player-rotate-270');
+          rotateLabel.textContent = '竖屏 0°';
+          this.showToast('已旋转 270° 横屏 (手势已同步横置)');
+        } else {
+          rotateLabel.textContent = '横屏 90°';
+          this.showToast('已恢复常规竖屏');
+        }
+
+        setTimeout(() => this.resizeDisplay(), 100);
+      }
+
+      togglePlay() {
+        if (this.video.paused) {
+          this.video.play().catch(() => {});
+        } else {
+          this.video.pause();
+        }
+      }
+
+      triggerControls() {
+        const topBar = document.getElementById('top-bar');
+        const bottomBar = document.getElementById('bottom-bar');
+        topBar.classList.remove('hidden-controls');
+        bottomBar.classList.remove('hidden-controls');
+
+        clearTimeout(this.controlsTimeout);
+        this.controlsTimeout = setTimeout(() => {
+          if (!this.video.paused) {
+            topBar.classList.add('hidden-controls');
+            bottomBar.classList.add('hidden-controls');
+          }
+        }, 3200);
+      }
+
+      toggleControls() {
+        const topBar = document.getElementById('top-bar');
+        const bottomBar = document.getElementById('bottom-bar');
+        const isHidden = topBar.classList.contains('hidden-controls');
+        if (isHidden) {
+          this.triggerControls();
+        } else {
+          topBar.classList.add('hidden-controls');
+          bottomBar.classList.add('hidden-controls');
+        }
+      }
+
+      showHud(type, text, ratio) {
+        const hud = document.getElementById('gesture-hud');
+        const hudText = document.getElementById('hud-text');
+        const hudBar = document.getElementById('hud-bar');
+        const hudIcon = document.getElementById('hud-icon');
+
+        hud.classList.remove('hidden');
+        hudText.textContent = text;
+        hudBar.style.width = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
+
+        let iconSvg = '';
+        if (type === 'volume') {
+          iconSvg = '<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>';
+        } else if (type === 'brightness') {
+          iconSvg = '<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1z"/></svg>';
+        } else if (type === 'progress') {
+          iconSvg = '<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>';
+        } else {
+          iconSvg = '<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>';
+        }
+        hudIcon.innerHTML = iconSvg;
+      }
+
+      hideHud() {
+        setTimeout(() => {
+          document.getElementById('gesture-hud').classList.add('hidden');
+        }, 280);
+      }
+
+      showToast(msg) {
+        const toast = document.getElementById('toast-msg');
+        toast.textContent = msg;
+        toast.classList.remove('hidden');
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 2200);
+      }
+
+      formatTime(sec) {
+        if (isNaN(sec) || !isFinite(sec)) return '00:00';
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      }
+
+      resizeDisplay() {
+        const fits = ['contain', 'cover', 'fill'];
+        this.video.style.objectFit = fits[this.aspectMode];
+      }
+
+      createProceduralDemoVideo() {
+        this.showToast('正在生成本地 60FPS 测试流...');
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = 1280;
+        tempCanvas.height = 720;
+        const ctx = tempCanvas.getContext('2d');
+        let frame = 0;
+
+        const drawFrame = () => {
+          frame++;
+          const grad = ctx.createLinearGradient(0, 0, 1280, 720);
+          grad.addColorStop(0, '#0c071e');
+          grad.addColorStop(1, '#031420');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 1280, 720);
+
+          ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+          ctx.lineWidth = 1;
+          for (let x = 0; x < 1280; x += 60) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, 720);
+            ctx.stroke();
+          }
+          for (let y = 0; y < 720; y += 60) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(1280, y);
+            ctx.stroke();
+          }
+
+          const cx = 640 + Math.sin(frame * 0.04) * 200;
+          const cy = 360 + Math.cos(frame * 0.04) * 100;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 130, 0, Math.PI * 2);
+          ctx.strokeStyle = '#00F0FF';
+          ctx.lineWidth = 6;
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 42px -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('APEX PLAYER 演示样本', 640, 340);
+
+          ctx.fillStyle = '#00F0FF';
+          ctx.font = '20px monospace';
+          ctx.fillText(`FRAME: ${frame} | 1080P PRO-RES 60FPS LOCAL`, 640, 395);
+
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '16px -apple-system, sans-serif';
+          ctx.fillText('请尝试右上方「横屏 90°」与「画质调节」', 640, 440);
+        };
+
+        if (tempCanvas.captureStream) {
+          const stream = tempCanvas.captureStream(60);
+          this.video.srcObject = stream;
+          document.getElementById('video-filename').textContent = '本地合成高帧率演示动画.stream';
+          document.getElementById('empty-state').classList.add('hidden');
+          this.video.play().catch(() => {});
+          
+          const loop = () => {
+            if (this.video.srcObject === stream) {
+              drawFrame();
+              requestAnimationFrame(loop);
+            }
+          };
+          requestAnimationFrame(loop);
+        } else {
+          this.video.src = 'https://vjs.zencdn.net/v/oceans.mp4';
+          document.getElementById('video-filename').textContent = 'Oceans_Nature_Sample.mp4';
+          document.getElementById('empty-state').classList.add('hidden');
+          this.video.play().catch(() => {});
+        }
+        this.triggerControls();
+      }
+
+      setupPWA() {
+        try {
+          const manifestObj = {
+            name: "极影播放器",
+            short_name: "极影播放",
+            start_url: window.location.href,
+            display: "standalone",
+            background_color: "#08080a",
+            theme_color: "#08080a",
+            icons: [
+              {
+                src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%2308080a'/><polygon points='38,30 74,50 38,70' fill='%2300F0FF'/></svg>",
+                sizes: "192x192 512x512",
+                type: "image/svg+xml"
+              }
+            ]
+          };
+          const blob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
+          const link = document.createElement('link');
+          link.rel = 'manifest';
+          link.href = URL.createObjectURL(blob);
+          document.head.appendChild(link);
+        } catch (e) {
+          // 静默容错
+        }
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        window.player = new ApexPlayer();
+      });
+    } else {
+      window.player = new ApexPlayer();
+    }
+  </script>
+</body>
+</html>
