@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>患者记录本</title>
+<style>
+  :root{
+    box-sizing:border-box;
+    --bg:#15161a;
+    --card:#212228;
+    --card2:#2a2b33;
+    --text:#f0f0f2;
+    --sub:#9a9ba5;
+    --accent:#4dd0a8;
+    --accent-dim:#2f7d63;
+    --danger:#e0616b;
+    --border:#33343c;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+    font-size:19px;
+    line-height:1.5;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .app{
+    max-width:600px;
+    margin:0 auto;
+    padding:16px 16px 100px;
+  }
+  header{
+    position:sticky;
+    top:env(safe-area-inset-top,0px);
+    background:var(--bg);
+    z-index:10;
+    padding:14px 0 10px;
+  }
+  h1{
+    font-size:24px;
+    margin:0 0 12px;
+    font-weight:700;
+  }
+  .search-box{
+    display:flex;
+    align-items:center;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:12px 14px;
+  }
+  .search-box input{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-size:19px;
+    padding:2px 8px;
+  }
+  .search-box input::placeholder{color:var(--sub);}
+  .search-icon{font-size:18px;opacity:.7;}
+  .count{
+    color:var(--sub);
+    font-size:15px;
+    margin:10px 2px 4px;
+  }
+  .list{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    margin-top:8px;
+  }
+  .patient-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:16px;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  .patient-card:active{background:var(--card2);}
+  .p-name{
+    font-size:21px;
+    font-weight:700;
+    margin-bottom:6px;
+  }
+  .p-tags{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:6px;
+  }
+  .tag{
+    background:rgba(77,208,168,0.15);
+    color:var(--accent);
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:15px;
+  }
+  .p-note{
+    color:var(--sub);
+    font-size:16px;
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+  .empty{
+    text-align:center;
+    color:var(--sub);
+    margin-top:60px;
+    font-size:17px;
+  }
+  .fab{
+    position:fixed;
+    right:20px;
+    bottom:calc(24px + env(safe-area-inset-bottom,0px));
+    width:62px;
+    height:62px;
+    border-radius:50%;
+    background:var(--accent);
+    color:#0d1410;
+    font-size:32px;
+    border:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 4px 14px rgba(0,0,0,0.4);
+    z-index:20;
+  }
+  .fab:active{background:var(--accent-dim);color:#fff;}
+
+  /* modal */
+  .overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.6);
+    display:none;
+    align-items:flex-end;
+    z-index:30;
+  }
+  .overlay.show{display:flex;}
+  .sheet{
+    background:var(--bg);
+    width:100%;
+    max-height:92vh;
+    overflow-y:auto;
+    border-radius:20px 20px 0 0;
+    padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));
+    animation:up .2s ease-out;
+  }
+  @keyframes up{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .sheet-title{
+    font-size:21px;
+    font-weight:700;
+    margin-bottom:16px;
+  }
+  label{
+    display:block;
+    font-size:16px;
+    color:var(--sub);
+    margin:16px 0 6px;
+  }
+  input[type=text], textarea{
+    width:100%;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px;
+    color:var(--text);
+    font-size:19px;
+    outline:none;
+    font-family:inherit;
+  }
+  textarea{min-height:90px;resize:vertical;}
+  .tag-input-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:8px;
+  }
+  .tag-chip{
+    background:var(--card2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:7px 12px;
+    border-radius:20px;
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .tag-chip button{
+    background:none;
+    border:none;
+    color:var(--sub);
+    font-size:16px;
+    cursor:pointer;
+    padding:0;
+    line-height:1;
+  }
+  .quick-tags{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:10px;
+  }
+  .quick-tag{
+    background:transparent;
+    border:1px dashed var(--border);
+    color:var(--sub);
+    padding:6px 12px;
+    border-radius:20px;
+    font-size:15px;
+  }
+  .btn-row{
+    display:flex;
+    gap:10px;
+    margin-top:24px;
+  }
+  button.primary{
+    flex:1;
+    background:var(--accent);
+    color:#0d1410;
+    border:none;
+    border-radius:14px;
+    padding:16px;
+    font-size:19px;
+    font-weight:700;
+  }
+  button.secondary{
+    background:var(--card);
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px 20px;
+    font-size:19px;
+  }
+  button.danger-text{
+    background:none;
+    border:none;
+    color:var(--danger);
+    font-size:17px;
+    margin-top:18px;
+    width:100%;
+    padding:10px;
+  }
+  .close-x{
+    position:absolute;
+    top:16px;
+    right:16px;
+    background:var(--card);
+    border:none;
+    color:var(--text);
+    width:36px;
+    height:36px;
+    border-radius:50%;
+    font-size:18px;
+  }
+  .sheet-wrap{position:relative;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🖐️ 患者记录本</h1>
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input id="searchInput" type="text" placeholder="输入姓名或特征搜索…">
+    </div>
+  </header>
+  <div class="count" id="countLabel"></div>
+  <div class="list" id="list"></div>
+  <div class="empty" id="emptyMsg" style="display:none;">还没有记录，点右下角 ＋ 添加患者</div>
+</div>
+
+<button class="fab" id="addBtn">＋</button>
+
+<div class="overlay" id="overlay">
+  <div class="sheet-wrap">
+    <div class="sheet">
+      <button class="close-x" id="closeBtn">✕</button>
+      <div class="sheet-title" id="sheetTitle">添加患者</div>
+
+      <label>姓名</label>
+      <input type="text" id="nameInput" placeholder="例如：王阿姨">
+
+      <label>特征标签（点击添加，或自己输入）</label>
+      <div class="tag-input-row" id="tagList"></div>
+      <input type="text" id="tagInput" placeholder="输入特征后按回车，如“肩颈痛”" style="margin-top:10px;">
+      <div class="quick-tags" id="quickTags"></div>
+
+      <label>备注</label>
+      <textarea id="noteInput" placeholder="其他备注信息…"></textarea>
+
+      <div class="btn-row">
+        <button class="secondary" id="cancelBtn">取消</button>
+        <button class="primary" id="saveBtn">保存</button>
+      </div>
+      <button class="danger-text" id="deleteBtn" style="display:none;">🗑 删除此患者</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'massage_patients_v1';
+let patients = [];
+let currentTags = [];
+let editingId = null;
+
+const QUICK_TAGS = ['肩颈痛','腰痛','失眠','胃寒','怕冷','产后','运动损伤','久坐办公','老年人','女性','男性'];
+
+function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    patients = raw ? JSON.parse(raw) : [];
+  }catch(e){ patients = []; }
+}
+function save(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(patients)); }
+  catch(e){ console.error('保存失败', e); }
+}
+
+function render(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const list = document.getElementById('list');
+  const empty = document.getElementById('emptyMsg');
+  const countLabel = document.getElementById('countLabel');
+
+  let filtered = patients;
+  if(q){
+    filtered = patients.filter(p=>{
+      const hay = (p.name + ' ' + p.tags.join(' ') + ' ' + p.note).toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  filtered = filtered.slice().sort((a,b)=>b.updatedAt - a.updatedAt);
+
+  countLabel.textContent = patients.length ? `共 ${patients.length} 位患者` + (q ? `，找到 ${filtered.length} 位` : '') : '';
+
+  list.innerHTML = '';
+  if(filtered.length === 0){
+    empty.style.display = 'block';
+    empty.textContent = patients.length === 0 ? '还没有记录，点右下角 ＋ 添加患者' : '没有找到匹配的患者';
+  } else {
+    empty.style.display = 'none';
+  }
+
+  filtered.forEach(p=>{
+    const card = document.createElement('div');
+    card.className = 'patient-card';
+    card.onclick = ()=>openEdit(p.id);
+    const tagsHtml = p.tags.map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('');
+    card.innerHTML = `
+      <div class="p-name">${escapeHtml(p.name)}</div>
+      <div class="p-tags">${tagsHtml}</div>
+      ${p.note ? `<div class="p-note">${escapeHtml(p.note)}</div>` : ''}
+    `;
+    list.appendChild(card);
+  });
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderTagChips(){
+  const el = document.getElementById('tagList');
+  el.innerHTML = currentTags.map((t,i)=>`
+    <span class="tag-chip">${escapeHtml(t)}<button data-i="${i}" onclick="removeTag(${i})">✕</button></span>
+  `).join('');
+}
+function removeTag(i){
+  currentTags.splice(i,1);
+  renderTagChips();
+}
+
+function renderQuickTags(){
+  const el = document.getElementById('quickTags');
+  el.innerHTML = QUICK_TAGS
+    .filter(t=>!currentTags.includes(t))
+    .map(t=>`<button type="button" class="quick-tag" onclick="addQuickTag('${t}')">+ ${t}</button>`)
+    .join('');
+}
+function addQuickTag(t){
+  if(!currentTags.includes(t)) currentTags.push(t);
+  renderTagChips();
+  renderQuickTags();
+}
+
+function openAdd(){
+  editingId = null;
+  document.getElementById('sheetTitle').textContent = '添加患者';
+  document.getElementById('nameInput').value = '';
+  document.getElementById('noteInput').value = '';
+  document.getElementById('tagInput').value = '';
+  document.getElementById('deleteBtn').style.display = 'none';
+  currentTags = [];
+  renderTagChips();
+  renderQuickTags();
+  showOverlay();
+}
+
+function openEdit(id){
+  const p = patients.find(x=>x.id===id);
+  if(!p) return;
+  editingId = id;
+  document.getElementById('sheetTitle').textContent = '编辑患者';
+  document.getElementById('nameInput').value = p.name;
+  document.getElementById('noteInput').value = p.note;
+  document.getElementById('tagInput').value = '';
+  document.getElementById('deleteBtn').style.display = 'block';
+  currentTags = p.tags.slice();
+  renderTagChips();
+  renderQuickTags();
+  showOverlay();
+}
+
+function showOverlay(){
+  document.getElementById('overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('nameInput').focus(), 100);
+}
+function hideOverlay(){
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function handleSave(){
+  const name = document.getElementById('nameInput').value.trim();
+  if(!name){
+    document.getElementById('nameInput').focus();
+    return;
+  }
+  const note = document.getElementById('noteInput').value.trim();
+  const pendingTag = document.getElementById('tagInput').value.trim();
+  if(pendingTag && !currentTags.includes(pendingTag)) currentTags.push(pendingTag);
+
+  if(editingId){
+    const p = patients.find(x=>x.id===editingId);
+    p.name = name; p.tags = currentTags.slice(); p.note = note; p.updatedAt = Date.now();
+  } else {
+    patients.push({
+      id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      name, tags: currentTags.slice(), note,
+      updatedAt: Date.now()
+    });
+  }
+  save();
+  hideOverlay();
+  render();
+}
+
+function handleDelete(){
+  if(!editingId) return;
+  if(!confirm('确定删除这位患者的记录吗？此操作无法撤销。')) return;
+  patients = patients.filter(x=>x.id!==editingId);
+  save();
+  hideOverlay();
+  render();
+}
+
+document.getElementById('addBtn').onclick = openAdd;
+document.getElementById('closeBtn').onclick = hideOverlay;
+document.getElementById('cancelBtn').onclick = hideOverlay;
+document.getElementById('saveBtn').onclick = handleSave;
+document.getElementById('deleteBtn').onclick = handleDelete;
+document.getElementById('overlay').addEventListener('click', e=>{
+  if(e.target.id === 'overlay') hideOverlay();
+});
+document.getElementById('searchInput').addEventListener('input', render);
+document.getElementById('tagInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    const v = e.target.value.trim();
+    if(v && !currentTags.includes(v)){
+      currentTags.push(v);
+      renderTagChips();
+      renderQuickTags();
+    }
+    e.target.value = '';
+  }
+});
+
+load();
+render();
+</script>
+</body>
+</html>
