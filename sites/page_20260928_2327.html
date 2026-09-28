@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>接诊记账</title>
+  
+  <!-- 桌面 App / PWA 全屏配置 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="接诊记账">
+  <meta name="theme-color" content="#0b0f19">
+
+  <!-- 内置应用图标 -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='120' fill='%230b0f19'/%3E%3Crect x='32' y='32' width='448' height='448' rx='96' fill='none' stroke='%23334155' stroke-width='8'/%3E%3Cpath d='M256 120 V392 M120 256 H392' stroke='%2338bdf8' stroke-width='48' stroke-linecap='round'/%3E%3Ccircle cx='256' cy='256' r='32' fill='%2360a5fa'/%3E%3C/svg%3E">
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: #0b0f19; color: #f1f5f9; padding: 12px; max-width: 480px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* 顶部导航栏 */
+    .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 4px 2px 10px 2px; flex-shrink: 0; }
+    .top-title { font-size: 18px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .top-date-tag { font-size: 12px; font-weight: normal; color: #38bdf8; background: #172554; padding: 3px 8px; border-radius: 6px; border: 1px solid #1e40af; }
+    .nav-actions { display: flex; gap: 8px; }
+    .nav-btn { background: #131b2e; border: 1px solid #22314d; color: #e2e8f0; width: 40px; height: 40px; border-radius: 10px; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .nav-btn:active { background: #1e293b; transform: scale(0.95); }
+
+    /* 当天数据统计看板 */
+    .dashboard-card { background: linear-gradient(135deg, #1d4ed8 0%, #0f172a 100%); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 14px; padding: 14px; margin-bottom: 12px; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+    .dash-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .dash-box { background: rgba(15, 23, 42, 0.6); padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); }
+    .dash-box label { font-size: 11px; color: #94a3b8; display: block; margin-bottom: 2px; }
+    .dash-box span { font-size: 22px; font-weight: 700; color: #fff; }
+    .dash-tags { display: flex; gap: 6px; }
+    .dash-tag { flex: 1; background: rgba(255,255,255,0.05); padding: 5px 6px; border-radius: 6px; text-align: center; font-size: 11px; border: 1px solid rgba(255,255,255,0.05); }
+
+    /* 明细列表容器 */
+    .list-wrapper { flex: 1; overflow-y: auto; padding-right: 2px; }
+    .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: #94a3b8; font-weight: 600; }
+    .record-card { background: #131b2e; border: 1px solid #1f2d47; border-radius: 10px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .record-name { font-size: 15px; font-weight: 600; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .tag-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+    .badge-meituan { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-yibao { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-xianjin { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .record-sub { font-size: 12px; color: #64748b; }
+    .record-ops { display: flex; gap: 6px; }
+    .record-ops button { padding: 6px 10px; font-size: 12px; border-radius: 6px; background: #0c1220; border: 1px solid #22314d; color: #cbd5e1; }
+    .record-ops .btn-del { color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+
+    /* 悬浮登记大按钮 (FAB) */
+    .fab-btn { position: fixed; bottom: 24px; right: 20px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; width: 62px; height: 62px; border-radius: 50%; border: none; font-size: 28px; font-weight: 300; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45); cursor: pointer; z-index: 90; }
+    .fab-btn:active { transform: scale(0.92); }
+
+    /* 通用弹窗蒙层 & 抽屉 */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
+    .modal-sheet { background: #131b2e; border: 1px solid #22314d; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 18px 16px 30px 16px; max-height: 88vh; display: flex; flex-direction: column; overflow-y: auto; animation: slideUp 0.2s ease-out; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0; }
+    .sheet-title { font-size: 16px; font-weight: 700; color: #fff; }
+    .sheet-close { font-size: 22px; color: #64748b; background: none; border: none; padding: 4px; cursor: pointer; }
+
+    /* 表单组件（防溢出核心设计） */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+    .form-input { width: 100%; height: 44px; background: #0c1220; border: 1px solid #22314d; border-radius: 8px; padding: 0 12px; font-size: 15px; color: #fff; outline: none; }
+    .form-input:focus { border-color: #3b82f6; }
+
+    /* 结算方式单选 */
+    .radio-pill-group { display: flex; gap: 8px; }
+    .radio-pill-item { flex: 1; }
+    .radio-pill-item input { display: none; }
+    .radio-pill-item label { display: block; height: 42px; line-height: 42px; text-align: center; background: #0c1220; border: 1px solid #22314d; border-radius: 8px; font-size: 13px; color: #94a3b8; }
+    .radio-pill-item input:checked + label { font-weight: 700; }
+    #p_meituan:checked + label { background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; color: #fbbf24; }
+    #p_yibao:checked + label { background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; color: #38bdf8; }
+    #p_xianjin:checked + label { background: rgba(16, 185, 129, 0.15); border-color: #10b981; color: #34d399; }
+
+    /* 部位增减器与快速选点 */
+    .stepper-row { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 8px; }
+    .btn-step-sub { width: 50px; height: 48px; background: #0c1220; border: 1px solid #22314d; color: #94a3b8; border-radius: 8px; font-size: 24px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-val-input { flex: 1; min-width: 0; height: 48px; background: #0c1220; border: 1px solid #22314d; color: #38bdf8; text-align: center; font-size: 20px; font-weight: 700; border-radius: 8px; }
+    .btn-step-add { width: 78px; height: 48px; background: #2563eb; border: none; color: #fff; border-radius: 8px; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .btn-step-add:active, .btn-step-sub:active { transform: scale(0.96); }
+
+    .quick-chips { display: flex; gap: 8px; }
+    .quick-chip { flex: 1; height: 32px; background: #0c1220; border: 1px solid #1f2d47; border-radius: 6px; font-size: 12px; color: #94a3b8; display: flex; align-items: center; justify-content: center; }
+    .quick-chip:active { background: #1e293b; color: #fff; }
+
+    .btn-sheet-submit { width: 100%; height: 46px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; margin-top: 10px; }
+
+    /* 日历弹窗网格 */
+    .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-cell { min-height: 48px; border-radius: 8px; background: #0c1220; border: 1px solid #1b263b; display: flex; flex-direction: column; align-items: center; padding: 4px 0; }
+    .cal-cell.active { background: #1d4ed8; border-color: #3b82f6; }
+    .cal-badge { font-size: 9px; margin-top: 2px; color: #38bdf8; transform: scale(0.85); font-weight: 600; }
+    .cal-cell.active .cal-badge { color: #fff; }
+
+    /* 对账弹窗内部 */
+    .date-checklist { max-height: 140px; overflow-y: auto; background: #0c1220; border: 1px solid #22314d; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+    .check-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; color: #cbd5e1; border-bottom: 1px solid #172136; }
+    .check-item:last-child { border-bottom: none; }
+    .export-preview { width: 100%; height: 160px; background: #0c1220; border: 1px solid #22314d; border-radius: 8px; color: #a5f3fc; font-size: 12px; line-height: 1.5; padding: 10px; resize: none; outline: none; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部导航栏 -->
+  <div class="top-bar">
+    <div class="top-title">
+      接诊记账
+      <span class="top-date-tag" id="currentDateTag" onclick="openCalendarModal()">今日</span>
+    </div>
+    <div class="nav-actions">
+      <button class="nav-btn" title="查看日历统计" onclick="openCalendarModal()">📅</button>
+      <button class="nav-btn" title="会计对账合并导出" onclick="openReportModal()">📋</button>
+    </div>
+  </div>
+
+  <!-- 当天看板 -->
+  <div class="dashboard-card">
+    <div class="dash-row">
+      <div class="dash-box">
+        <label id="dashDateLabel">今日接诊</label>
+        <span id="statPatients">0 人</span>
+      </div>
+      <div class="dash-box">
+        <label>部位总数</label>
+        <span id="statParts">0 个</span>
+      </div>
+    </div>
+    <div class="dash-tags">
+      <div class="dash-tag">美团: <b id="statMeituan" style="color:#fbbf24">0</b></div>
+      <div class="dash-tag">医保: <b id="statYibao" style="color:#38bdf8">0</b></div>
+      <div class="dash-tag">现金: <b id="statXianjin" style="color:#34d399">0</b></div>
+    </div>
+  </div>
+
+  <!-- 明细列表 -->
+  <div class="list-wrapper">
+    <div class="list-header">
+      <span id="listTitle">当日患者明细</span>
+      <span id="listCount">共 0 条</span>
+    </div>
+    <div id="recordsContainer"></div>
+  </div>
+
+  <!-- 悬浮登记按钮 -->
+  <button class="fab-btn" onclick="openFormModal()">+</button>
+
+  <!-- 弹窗 1：登记 / 修改弹窗 (Bottom Sheet) -->
+  <div class="modal-overlay" id="formModal" onclick="closeOnBackdrop(event, 'formModal')">
+    <div class="modal-sheet">
+      <div class="sheet-head">
+        <div class="sheet-title" id="formModalTitle">登记新患者</div>
+        <button class="sheet-close" onclick="closeModal('formModal')">✕</button>
+      </div>
+
+      <input type="hidden" id="editRecordId">
+
+      <div class="form-group">
+        <label>接诊时间</label>
+        <input type="time" id="fTime" class="form-input">
+      </div>
+
+      <div class="form-group">
+        <label>患者姓名</label>
+        <input type="text" id="fName" class="form-input" placeholder="输入患者姓名">
+      </div>
+
+      <div class="form-group">
+        <label>支付渠道</label>
+        <div class="radio-pill-group">
+          <div class="radio-pill-item">
+            <input type="radio" name="payType" id="p_meituan" value="美团" checked>
+            <label for="p_meituan">美团</label>
+          </div>
+          <div class="radio-pill-item">
+            <input type="radio" name="payType" id="p_yibao" value="医保">
+            <label for="p_yibao">医保</label>
+          </div>
+          <div class="radio-pill-item">
+            <input type="radio" name="payType" id="p_xianjin" value="现金">
+            <label for="p_xianjin">现金</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>调理部位数</label>
+        <div class="stepper-row">
+          <button type="button" class="btn-step-sub" onclick="stepParts(-1)">-</button>
+          <input type="number" id="fParts" class="step-val-input" value="1" min="1" readonly>
+          <button type="button" class="btn-step-add" onclick="stepParts(1)">+ 1</button>
+        </div>
+        <!-- 快捷速选按钮 -->
+        <div class="quick-chips">
+          <div class="quick-chip" onclick="setParts(1)">1 部位</div>
+          <div class="quick-chip" onclick="setParts(2)">2 部位</div>
+          <div class="quick-chip" onclick="setParts(3)">3 部位</div>
+          <div class="quick-chip" onclick="setParts(4)">4 部位</div>
+        </div>
+      </div>
+
+      <button type="button" class="btn-sheet-submit" id="btnSave" onclick="saveRecord()">保存登记</button>
+    </div>
+  </div>
+
+  <!-- 弹窗 2：日历选择与统计弹窗 -->
+  <div class="modal-overlay" id="calModal" onclick="closeOnBackdrop(event, 'calModal')">
+    <div class="modal-sheet">
+      <div class="sheet-head">
+        <div class="sheet-title" id="calMonthDisplay">2026年 9月</div>
+        <button class="sheet-close" onclick="closeModal('calModal')">✕</button>
+      </div>
+
+      <div class="cal-nav">
+        <button class="nav-btn" style="width:34px;height:34px;" onclick="changeMonth(-1)">‹</button>
+        <button class="nav-btn" style="width:auto;height:34px;padding:0 12px;font-size:12px;color:#38bdf8;" onclick="gotoToday()">选今天</button>
+        <button class="nav-btn" style="width:34px;height:34px;" onclick="changeMonth(1)">›</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(7, 1fr); text-align:center; font-size:11px; color:#64748b; margin-bottom:6px;">
+        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+      </div>
+      <div class="cal-grid" id="calGridBox"></div>
+    </div>
+  </div>
+
+  <!-- 弹窗 3：会计多日对账导出合并弹窗 -->
+  <div class="modal-overlay" id="reportModal" onclick="closeOnBackdrop(event, 'reportModal')">
+    <div class="modal-sheet">
+      <div class="sheet-head">
+        <div class="sheet-title">生成会计对账汇总</div>
+        <button class="sheet-close" onclick="closeModal('reportModal')">✕</button>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-size:12px; color:#94a3b8;">选择要统计的日期：</span>
+        <div style="font-size:12px;">
+          <a href="javascript:void(0)" onclick="selectAllReportDates(true)" style="color:#38bdf8; text-decoration:none; margin-right:8px;">全选</a>
+          <a href="javascript:void(0)" onclick="selectRecentReportDates(5)" style="color:#38bdf8; text-decoration:none;">近5天</a>
+        </div>
+      </div>
+
+      <div class="date-checklist" id="dateChecklist"></div>
+
+      <label style="font-size:12px; color:#94a3b8; margin-bottom:6px; display:block;">合并排版预览（已自动规整）：</label>
+      <textarea class="export-preview" id="reportPreview" readonly></textarea>
+
+      <button type="button" class="btn-sheet-submit" onclick="copyReportText()">一键复制到剪贴板发微信</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'tcm_session_records_v3';
+    let records = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    
+    // 当前选中日期
+    let currentDate = new Date().toISOString().split('T')[0];
+    let viewY = new Date().getFullYear();
+    let viewM = new Date().getMonth();
+
+    window.onload = function() {
+      renderDashboardAndList();
+    };
+
+    function renderDashboardAndList() {
+      // 顶部日期标记
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isToday = currentDate === todayStr;
+      document.getElementById('currentDateTag').innerText = isToday ? `今日 (${currentDate.slice(5)})` : currentDate;
+      document.getElementById('dashDateLabel').innerText = isToday ? "今日接诊" : `${currentDate.slice(5)} 接诊`;
+      document.getElementById('listTitle').innerText = `${currentDate} 明细`;
+
+      const list = records.filter(r => r.date === currentDate);
+      let parts = 0, meituan = 0, yibao = 0, xianjin = 0;
+      list.forEach(r => {
+        parts += Number(r.parts);
+        if (r.type === '美团') meituan++;
+        if (r.type === '医保') yibao++;
+        if (r.type === '现金') xianjin++;
+      });
+
+      document.getElementById('statPatients').innerText = `${list.length} 人`;
+      document.getElementById('statParts').innerText = `${parts} 个`;
+      document.getElementById('statMeituan').innerText = `${meituan}人`;
+      document.getElementById('statYibao').innerText = `${yibao}人`;
+      document.getElementById('statXianjin').innerText = `${xianjin}人`;
+      document.getElementById('listCount').innerText = `共 ${list.length} 条`;
+
+      // 渲染列表
+      const box = document.getElementById('recordsContainer');
+      if (list.length === 0) {
+        box.innerHTML = '<div style="text-align:center;color:#475569;font-size:13px;padding:40px 0;">该日期暂无登记数据<br>点击右下角 “+” 开始登记</div>';
+        return;
+      }
+
+      box.innerHTML = list.map(item => {
+        let bClass = 'badge-meituan';
+        if (item.type === '医保') bClass = 'badge-yibao';
+        if (item.type === '现金') bClass = 'badge-xianjin';
+
+        return `
+          <div class="record-card">
+            <div>
+              <div class="record-name">
+                ${item.name}
+                <span class="tag-badge ${bClass}">${item.type}</span>
+              </div>
+              <div class="record-sub">
+                时间: ${item.time} | 部位: ${item.parts} 个
+              </div>
+            </div>
+            <div class="record-ops">
+              <button onclick="editRecord('${item.id}')">修改</button>
+              <button class="btn-del" onclick="deleteRecord('${item.id}')">删除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 弹窗控制
+    function openModal(id) {
+      document.getElementById(id).style.display = 'flex';
+    }
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+    function closeOnBackdrop(e, id) {
+      if (e.target.id === id) closeModal(id);
+    }
+
+    // 登记弹窗处理
+    function openFormModal(isEdit = false) {
+      if (!isEdit) {
+        document.getElementById('editRecordId').value = '';
+        document.getElementById('formModalTitle').innerText = `登记患者 (${currentDate})`;
+        document.getElementById('fName').value = '';
+        document.getElementById('fParts').value = '1';
+        document.getElementById('p_meituan').checked = true;
+        document.getElementById('btnSave').innerText = '保存登记';
+
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('fTime').value = `${h}:${m}`;
+      }
+      openModal('formModal');
+    }
+
+    function stepParts(delta) {
+      const el = document.getElementById('fParts');
+      let val = parseInt(el.value) || 1;
+      val = Math.max(1, val + delta);
+      el.value = val;
+    }
+    function setParts(val) {
+      document.getElementById('fParts').value = val;
+    }
+
+    function saveRecord() {
+      const name = document.getElementById('fName').value.trim();
+      const time = document.getElementById('fTime').value;
+      const type = document.querySelector('input[name="payType"]:checked').value;
+      const parts = parseInt(document.getElementById('fParts').value) || 1;
+      const editId = document.getElementById('editRecordId').value;
+
+      if (!name) {
+        alert('请输入患者姓名');
+        return;
+      }
+
+      if (editId) {
+        const idx = records.findIndex(r => r.id === editId);
+        if (idx > -1) {
+          records[idx] = { ...records[idx], name, time, type, parts };
+        }
+      } else {
+        records.unshift({
+          id: Date.now().toString(),
+          date: currentDate,
+          time,
+          name,
+          type,
+          parts
+        });
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      closeModal('formModal');
+      renderDashboardAndList();
+    }
+
+    function editRecord(id) {
+      const item = records.find(r => r.id === id);
+      if (!item) return;
+
+      document.getElementById('editRecordId').value = item.id;
+      document.getElementById('formModalTitle').innerText = `修改记录 (${item.date})`;
+      document.getElementById('fTime').value = item.time;
+      document.getElementById('fName').value = item.name;
+      document.getElementById('fParts').value = item.parts;
+      const radio = document.querySelector(`input[name="payType"][value="${item.type}"]`);
+      if (radio) radio.checked = true;
+
+      document.getElementById('btnSave').innerText = '保存修改';
+      openFormModal(true);
+    }
+
+    function deleteRecord(id) {
+      if (confirm('确认删除该患者记录吗？')) {
+        records = records.filter(r => r.id !== id);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        renderDashboardAndList();
+      }
+    }
+
+    // 日历弹窗逻辑
+    function openCalendarModal() {
+      renderCalendar();
+      openModal('calModal');
+    }
+    function changeMonth(d) {
+      viewM += d;
+      if (viewM < 0) { viewM = 11; viewY--; }
+      if (viewM > 11) { viewM = 0; viewY++; }
+      renderCalendar();
+    }
+    function gotoToday() {
+      const today = new Date();
+      currentDate = today.toISOString().split('T')[0];
+      viewY = today.getFullYear();
+      viewM = today.getMonth();
+      closeModal('calModal');
+      renderDashboardAndList();
+    }
+
+    function renderCalendar() {
+      document.getElementById('calMonthDisplay').innerText = `${viewY}年 ${viewM + 1}月`;
+      const grid = document.getElementById('calGridBox');
+      grid.innerHTML = '';
+
+      const firstDay = new Date(viewY, viewM, 1).getDay();
+      const totalDays = new Date(viewY, viewM + 1, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        const empty = document.createElement('div');
+        empty.style.minHeight = '48px';
+        grid.appendChild(empty);
+      }
+
+      for (let d = 1; d <= totalDays; d++) {
+        const mStr = String(viewM + 1).padStart(2, '0');
+        const dStr = String(d).padStart(2, '0');
+        const dateKey = `${viewY}-${mStr}-${dStr}`;
+
+        const cell = document.createElement('div');
+        cell.className = `cal-cell ${dateKey === currentDate ? 'active' : ''}`;
+        cell.onclick = () => {
+          currentDate = dateKey;
+          closeModal('calModal');
+          renderDashboardAndList();
+        };
+
+        const dayRecs = records.filter(r => r.date === dateKey);
+        let badge = '';
+        if (dayRecs.length > 0) {
+          const partsSum = dayRecs.reduce((s, r) => s + Number(r.parts), 0);
+          badge = `<span class="cal-badge">${dayRecs.length}人·${partsSum}部</span>`;
+        }
+
+        cell.innerHTML = `
+          <span style="font-size:13px; font-weight:600; color:${dateKey === currentDate ? '#fff' : '#cbd5e1'}">${d}</span>
+          ${badge}
+        `;
+        grid.appendChild(cell);
+      }
+    }
+
+    // 会计多日对账导出逻辑
+    function openReportModal() {
+      // 提取所有有记录的日期，以及当前日期
+      const dateSet = new Set(records.map(r => r.date));
+      dateSet.add(currentDate);
+      const allDates = Array.from(dateSet).sort().reverse(); // 最近的在最前
+
+      const checkContainer = document.getElementById('dateChecklist');
+      checkContainer.innerHTML = allDates.map((d, idx) => `
+        <label class="check-item">
+          <input type="checkbox" name="reportDate" value="${d}" ${idx < 5 ? 'checked' : ''} onchange="generateReportPreview()">
+          <span>${d}</span>
+        </label>
+      `).join('');
+
+      generateReportPreview();
+      openModal('reportModal');
+    }
+
+    function selectAllReportDates(flag) {
+      document.querySelectorAll('input[name="reportDate"]').forEach(cb => cb.checked = flag);
+      generateReportPreview();
+    }
+
+    function selectRecentReportDates(n) {
+      const cbs = document.querySelectorAll('input[name="reportDate"]');
+      cbs.forEach((cb, idx) => cb.checked = idx < n);
+      generateReportPreview();
+    }
+
+    // 格式化生成对账单文本
+    function generateReportPreview() {
+      const selectedDates = Array.from(document.querySelectorAll('input[name="reportDate"]:checked'))
+                                 .map(cb => cb.value)
+                                 .sort(); // 按时间正序排列展示
+
+      if (selectedDates.length === 0) {
+        document.getElementById('reportPreview').value = '未选择任何日期';
+        return;
+      }
+
+      let text = `【门诊接诊明细对账单】\n`;
+      let grandTotalPatients = 0;
+      let grandTotalParts = 0;
+      let grandMeituan = 0, grandYibao = 0, grandXianjin = 0;
+
+      selectedDates.forEach(d => {
+        const dayList = records.filter(r => r.date === d);
+        if (dayList.length === 0) return;
+
+        let dayParts = 0, dMt = 0, dYb = 0, dXj = 0;
+        dayList.forEach(r => {
+          dayParts += Number(r.parts);
+          if (r.type === '美团') dMt++;
+          if (r.type === '医保') dYb++;
+          if (r.type === '现金') dXj++;
+        });
+
+        grandTotalPatients += dayList.length;
+        grandTotalParts += dayParts;
+        grandMeituan += dMt;
+        grandYibao += dYb;
+        grandXianjin += dXj;
+
+        text += `\n📅 日期：${d}\n`;
+        text += `当日统计：总共 ${dayList.length} 人，调理 ${dayParts} 个部位 (美团:${dMt} | 医保:${dYb} | 现金:${dXj})\n`;
+        text += `明细清单：\n`;
+
+        // 按时间排序
+        const sortedDayList = [...dayList].sort((a,b) => a.time.localeCompare(b.time));
+        sortedDayList.forEach((r, idx) => {
+          text += `  ${idx + 1}. [${r.time}] ${r.name} - ${r.type} - ${r.parts}个部位\n`;
+        });
+      });
+
+      text += `\n----------------------------\n`;
+      text += `【统计总汇】\n`;
+      text += `统计天数：${selectedDates.length} 天\n`;
+      text += `总接诊人次：${grandTotalPatients} 人\n`;
+      text += `总调理部位：${grandTotalParts} 个\n`;
+      text += `结算渠道汇总：美团 ${grandMeituan} 人 | 医保 ${grandYibao} 人 | 现金 ${grandXianjin} 人`;
+
+      document.getElementById('reportPreview').value = text;
+    }
+
+    function copyReportText() {
+      const text = document.getElementById('reportPreview').value;
+      if (!text || text === '未选择任何日期') {
+        alert('请先勾选需要对账的日期');
+        return;
+      }
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert('已复制合并对账单！可以直接粘贴发给会计');
+        closeModal('reportModal');
+      }).catch(() => {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('已复制合并对账单！可以直接粘贴发给会计');
+        closeModal('reportModal');
+      });
+    }
+  </script>
+</body>
+</html>
