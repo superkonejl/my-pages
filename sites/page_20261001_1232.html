@@ -1,0 +1,169 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="播放器">
+<link rel="apple-touch-icon" id="ati"><link rel="manifest" id="mf">
+<title>本地播放器</title>
+<style>
+:root{--fg:#f5f5f7;--mut:#8e8e93;--ac:#ff9f43;--pt:env(safe-area-inset-top,0px);--pb:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+html,body{height:100%;margin:0;background:#000;overflow:hidden;color:var(--fg);font-family:-apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-serif}
+svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#rot{position:fixed;top:0;left:0;background:#000;overflow:hidden;transform-origin:0 0}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+video:not([src]){visibility:hidden}
+#cv{position:absolute;display:none;pointer-events:none}
+#g{position:absolute;inset:0;touch-action:none}
+.bar{position:absolute;left:0;right:0;display:flex;align-items:center;gap:12px;padding:12px 16px;transition:opacity .25s}
+#top{top:0;padding-top:calc(12px + var(--pt));background:linear-gradient(#000a,transparent)}
+#bot{bottom:0;flex-direction:column;align-items:stretch;gap:6px;padding-bottom:calc(14px + var(--pb));background:linear-gradient(transparent,#000c)}
+.hide .bar{opacity:0;pointer-events:none}
+#ttl{flex:1;font-size:13px;color:#fff9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+.ib,.pill{background:#ffffff1f;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:0;color:var(--fg);font-family:inherit;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ib{width:42px;height:42px;border-radius:50%}
+.ib.on{background:var(--ac);color:#1a1000}
+.ib.big{width:60px;height:60px;background:#fff;color:#111}.ib.big svg{width:26px;height:26px;fill:#111;stroke:#111}
+.pill{height:36px;min-width:52px;padding:0 14px;border-radius:18px;font-size:14px;font-weight:600}
+.pk{position:relative;overflow:hidden}.pk input{position:absolute;inset:0;width:100%;height:100%;opacity:0}
+#row1{display:flex;align-items:center;gap:10px}
+#row2{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+#row2 .l{display:flex;gap:12px}#row2 .r{display:flex;justify-content:flex-end}
+#t,#d{font-size:12px;color:#fffb;font-variant-numeric:tabular-nums;min-width:36px}#d{text-align:right}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:28px;background:transparent;margin:0;--p:0%}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--ac) var(--p),#ffffff30 var(--p))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;margin-top:-6px;box-shadow:0 1px 4px #0008}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:#ffffff30}
+input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--ac)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:#fff}
+#hud{position:absolute;top:20%;left:50%;transform:translateX(-50%);background:#000a;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding:9px 18px;border-radius:20px;font-size:15px;font-weight:500;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+#hud.s{opacity:1}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:20px;pointer-events:none}
+.cta{pointer-events:auto;background:linear-gradient(135deg,#ffb454,#ff8a3d);color:#1a1000;padding:16px 36px;border-radius:32px;font-size:17px;font-weight:600;display:inline-flex;align-items:center;gap:8px;box-shadow:0 8px 30px #ff8a3d40}
+.cta svg{fill:#1a1000;stroke:#1a1000;width:18px;height:18px}
+.ghost{pointer-events:auto;background:none;border:0;color:var(--mut);font-size:13px;font-family:inherit;padding:8px 14px}
+#msg{color:#ff6b6b;font-size:13px;text-align:center}
+#pan{position:absolute;inset:0;background:#000b;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:5}
+.card{width:min(90%,420px);max-height:92%;overflow:auto;background:#1c1c1ee6;border-radius:22px;padding:16px 18px}
+.card h3{margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;font-size:17px}
+.card h3 .pill{height:32px;background:var(--ac);color:#1a1000}
+.it{display:grid;grid-template-columns:1fr auto;align-items:center;padding:6px 0;font-size:14px}
+.it b{color:var(--ac);font-weight:600}.it input{grid-column:1/3}
+.wide{width:100%;margin-top:8px;height:42px;border-radius:21px;font-size:14px}
+</style></head><body>
+<div id="rot">
+<video id="v" playsinline webkit-playsinline preload="auto"></video>
+<canvas id="cv"></canvas>
+<div id="g"></div>
+<div id="empty"><label class="cta pk"><svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>选择视频<input type="file" accept="video/*"></label><div id="msg"></div><button class="ghost" id="inst2">添加到主屏幕</button></div>
+<div id="hud"></div>
+<div class="bar" id="top"><label class="ib pk"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2z"/></svg><input type="file" accept="video/*"></label><div id="ttl"></div><button class="ib" id="set"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button></div>
+<div class="bar" id="bot">
+<div id="row1"><span id="t">0:00</span><input id="r" type="range" min="0" max="1000" value="0"><span id="d">0:00</span></div>
+<div id="row2"><div class="l"><button class="ib" id="enh"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg></button><button class="ib" id="rt"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.6-5.9M20 4v4h-4"/></svg></button></div><button class="ib big" id="play"></button><div class="r"><button class="pill" id="spd">1×</button></div></div>
+</div>
+<div id="pan"><div class="card"><h3>设置<button class="pill" id="px">完成</button></h3>
+<div class="it"><span>滑动快进范围</span><b id="o1"></b><input id="s1" type="range" min="20" max="600" step="10"></div>
+<div class="it"><span>双击跳转</span><b id="o2"></b><input id="s2" type="range" min="3" max="60" step="1"></div>
+<div class="it"><span>长按倍速</span><b id="o3"></b><input id="s3" type="range" min="1.25" max="4" step=".25"></div>
+<div class="it"><span>画质增强强度</span><b id="o4"></b><input id="s4" type="range" min="0" max="100" step="5"></div>
+<button class="pill wide" id="inst">添加到主屏幕</button>
+</div></div>
+</div>
+<script>
+const $=i=>document.getElementById(i),v=$('v'),cv=$('cv'),rot_=$('rot'),g=$('g');
+let rot=0,bright=1,spdI=1,hideT,dragging=false,enhOn=false,gl,tex,U={},dirty=true,lastT=-1;
+const S={swipe:120,dbl:10,lp:2,enh:.6},SP=[.5,1,1.25,1.5,2];
+const fmt=s=>{s=Math.max(0,s|0);const h=s/3600|0,m=(s%3600)/60|0,x=s%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+const setP=e=>e.style.setProperty('--p',(e.value-e.min)/(e.max-e.min)*100+'%');
+const PL='<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>',PA='<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" style="stroke-width:3.5"/></svg>';
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+function fit(){const w=rot_.clientWidth,h=rot_.clientHeight,vw=v.videoWidth||16,vh=v.videoHeight||9,s=Math.min(w/vw,h/vh),cw=vw*s,ch=vh*s,d=Math.min(devicePixelRatio||1,2),m=Math.min(1,2560/(Math.max(cw,ch)*d));
+ cv.style.width=cw+'px';cv.style.height=ch+'px';cv.style.left=(w-cw)/2+'px';cv.style.top=(h-ch)/2+'px';
+ cv.width=Math.round(cw*d*m);cv.height=Math.round(ch*d*m);if(gl)gl.viewport(0,0,cv.width,cv.height);dirty=true}
+function layout(){const W=innerWidth,H=innerHeight,s=rot_.style;
+ if(!rot){s.width=W+'px';s.height=H+'px';s.transform='none'}
+ else{s.width=H+'px';s.height=W+'px';s.transform=rot>0?`translateX(${W}px) rotate(90deg)`:`translateY(${H}px) rotate(-90deg)`}fit()}
+const LW=()=>rot?innerHeight:innerWidth,LH=()=>rot?innerWidth:innerHeight;
+function loc(cx,cy){return !rot?[cx,cy]:rot>0?[cy,innerWidth-cx]:[innerHeight-cy,cx]}
+function filt(){v.style.filter=cv.style.filter=`brightness(${bright})`}
+// WebGL enhance: contrast-adaptive sharpen + contrast/saturation
+function initGL(){try{gl=cv.getContext('webgl',{alpha:false});if(!gl)return false;
+ const vs='attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}';
+ const fs=`precision mediump float;varying vec2 uv;uniform sampler2D t;uniform vec2 px;uniform float k;
+void main(){vec3 c=texture2D(t,uv).rgb,n=texture2D(t,uv-vec2(0.,px.y)).rgb,s=texture2D(t,uv+vec2(0.,px.y)).rgb,e=texture2D(t,uv+vec2(px.x,0.)).rgb,w=texture2D(t,uv-vec2(px.x,0.)).rgb;
+vec3 mn=min(min(min(n,s),min(e,w)),c),mx=max(max(max(n,s),max(e,w)),c);
+vec3 a=sqrt(clamp(min(mn,1.-mx)/max(mx,.001),0.,1.));
+vec3 wt=a*(-1./mix(8.,4.5,k));
+c=(c+wt*(n+s+e+w))/(1.+4.*wt);
+c=(c-.5)*(1.+.12*k)+.5;float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,1.+.2*k);
+gl_FragColor=vec4(clamp(c,0.,1.),1.);}`;
+ const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o};
+ const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);
+ if(!gl.getProgramParameter(pr,gl.LINK_STATUS))return false;gl.useProgram(pr);
+ gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+ const a=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
+ tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
+ [[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR]].forEach(([k,x])=>gl.texParameteri(gl.TEXTURE_2D,k,x));
+ U.px=gl.getUniformLocation(pr,'px');U.k=gl.getUniformLocation(pr,'k');gl.viewport(0,0,cv.width,cv.height);return true}catch(e){return false}}
+function loop(){requestAnimationFrame(loop);if(!enhOn||v.readyState<2||!v.videoWidth)return;
+ if(!dirty&&v.currentTime===lastT)return;lastT=v.currentTime;dirty=false;
+ try{gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,v);
+ gl.uniform2f(U.px,1/v.videoWidth,1/v.videoHeight);gl.uniform1f(U.k,S.enh);gl.drawArrays(gl.TRIANGLE_STRIP,0,4)}catch(e){setEnh(false);hud('此设备不支持画质增强')}}
+function setEnh(on){if(on&&!gl&&!initGL()){hud('此设备不支持画质增强');on=false}
+ enhOn=on;cv.style.display=on?'block':'none';v.style.opacity=on?0:1;dirty=true;$('enh').classList.toggle('on',on)}
+let hudT;function hud(t){const h=$('hud');h.textContent=t;h.classList.add('s');clearTimeout(hudT);hudT=setTimeout(()=>h.classList.remove('s'),900)}
+const hudOff=()=>$('hud').classList.remove('s');
+function showUI(){rot_.classList.remove('hide');clearTimeout(hideT);if(!v.paused)hideT=setTimeout(()=>rot_.classList.add('hide'),3200)}
+function toggleUI(){rot_.classList.contains('hide')?showUI():(clearTimeout(hideT),rot_.classList.add('hide'))}
+const toggle=()=>v.paused?v.play():v.pause();
+function seekBy(d){v.currentTime=clamp(v.currentTime+d,0,v.duration||0);hud((d>0?'⏩ +':'⏪ ')+d+' 秒')}
+document.querySelectorAll('input[type=file]').forEach(i=>i.onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+ if(v.src)URL.revokeObjectURL(v.src);$('msg').textContent='';v.src=URL.createObjectURL(f);$('ttl').textContent=f.name;$('empty').style.display='none';v.play().catch(()=>{});showUI()});
+v.onerror=()=>{$('empty').style.display='flex';$('msg').textContent='无法播放（错误 '+(v.error?v.error.code:'?')+'）· 格式不支持或请用浏览器打开'};
+v.onloadedmetadata=()=>{$('d').textContent=fmt(v.duration);if(v.videoWidth>v.videoHeight&&innerHeight>innerWidth)rot=1;layout()};
+v.onplay=v.onpause=()=>{$('play').innerHTML=v.paused?PL:PA;showUI()};
+v.onseeked=()=>dirty=true;
+v.ontimeupdate=()=>{if(!dragging&&v.duration){$('r').value=v.currentTime/v.duration*1000;setP($('r'))}$('t').textContent=fmt(v.currentTime)};
+$('r').oninput=e=>{dragging=true;v.currentTime=e.target.value/1000*v.duration;setP(e.target);showUI()};
+$('r').onchange=()=>dragging=false;
+$('play').onclick=toggle;
+$('rt').onclick=()=>{rot=rot===0?1:rot===1?-1:0;layout();showUI()};
+$('enh').onclick=()=>{setEnh(!enhOn);showUI()};
+$('spd').onclick=()=>{spdI=(spdI+1)%SP.length;v.playbackRate=SP[spdI];$('spd').textContent=SP[spdI]+'×';showUI()};
+// settings
+const cfg=[['s1','o1','swipe',x=>x+' 秒'],['s2','o2','dbl',x=>x+' 秒'],['s3','o3','lp',x=>x+'×'],['s4','o4','enh',x=>Math.round(x*100)+'%']];
+cfg.forEach(([s,o,k,f])=>{const e=$(s);e.value=k==='enh'?S[k]*100:S[k];$(o).textContent=f(S[k]);setP(e);
+ e.oninput=()=>{S[k]=k==='enh'?e.value/100:+e.value;$(o).textContent=f(S[k]);setP(e);dirty=true}});
+$('set').onclick=()=>{$('pan').style.display='flex';clearTimeout(hideT)};
+$('px').onclick=()=>{$('pan').style.display='none';showUI()};
+// gestures
+let st=null,tapT=0,tapTm,lp;
+g.onpointerdown=e=>{if(!v.src)return;g.setPointerCapture(e.pointerId);const[x,y]=loc(e.clientX,e.clientY);
+ st={x,y,mode:null,moved:false,t:v.currentTime,vol:v.volume,br:bright};
+ lp=setTimeout(()=>{if(st&&!st.moved){st.mode='lp';st.prev=v.playbackRate;v.playbackRate=S.lp;if(v.paused)v.play();hud('⏩ '+S.lp+'× 倍速播放中')}},450)};
+g.onpointermove=e=>{if(!st)return;const[x,y]=loc(e.clientX,e.clientY),dx=x-st.x,dy=y-st.y;
+ if(!st.mode&&Math.max(Math.abs(dx),Math.abs(dy))>10){st.moved=true;clearTimeout(lp);st.mode=Math.abs(dx)>Math.abs(dy)?'seek':(st.x<LW()/2?'br':'vol')}
+ if(st.mode==='seek'&&v.duration){const d=dx/LW()*S.swipe;st.target=clamp(st.t+d,0,v.duration);hud(`${d>=0?'⏩':'⏪'} ${fmt(st.target)} / ${fmt(v.duration)}`)}
+ else if(st.mode==='br'){bright=clamp(st.br-dy/(LH()*.7),.3,1.8);filt();hud('☀ 亮度 '+Math.round(bright*100)+'%')}
+ else if(st.mode==='vol'){v.volume=clamp(st.vol-dy/(LH()*.7),0,1);hud('🔊 音量 '+Math.round(v.volume*100)+'%')}};
+g.onpointerup=g.onpointercancel=()=>{if(!st)return;clearTimeout(lp);const s=st;st=null;
+ if(s.mode==='seek'&&s.target!=null)v.currentTime=s.target;
+ if(s.mode==='lp')v.playbackRate=s.prev;
+ if(s.mode)return hudOff();
+ const now=Date.now();
+ if(now-tapT<300){clearTimeout(tapTm);tapT=0;const w=LW();
+  if(s.x<w/3)seekBy(-S.dbl);else if(s.x>w*2/3)seekBy(S.dbl);else{toggle();hud(v.paused?'⏸ 暂停':'▶ 播放')}}
+ else{tapT=now;tapTm=setTimeout(toggleUI,300)}};
+$('bot').addEventListener('pointerdown',showUI);
+addEventListener('resize',layout);addEventListener('orientationchange',()=>setTimeout(layout,150));
+// add to home screen
+(function(){try{const mk=n=>{const c=document.createElement('canvas');c.width=c.height=n;const x=c.getContext('2d');x.fillStyle='#0b0b0d';x.fillRect(0,0,n,n);
+ const g=x.createLinearGradient(0,0,n,n);g.addColorStop(0,'#ffb454');g.addColorStop(1,'#ff8a3d');x.fillStyle=g;x.beginPath();x.arc(n/2,n/2,n*.3,0,7);x.fill();
+ x.fillStyle='#1a1000';x.beginPath();x.moveTo(n*.45,n*.38);x.lineTo(n*.64,n/2);x.lineTo(n*.45,n*.62);x.fill();return c.toDataURL('image/png')};
+ const i1=mk(192),i2=mk(512);$('ati').href=mk(180);
+ $('mf').href=URL.createObjectURL(new Blob([JSON.stringify({name:'本地播放器',short_name:'播放器',display:'standalone',background_color:'#000000',theme_color:'#000000',id:(/^https?:/.test(location.protocol)?location.origin:'')+'/?app=local-video-player-7f3a',start_url:location.href,scope:location.href.split('?')[0].replace(/[^/]*$/,''),icons:[{src:i1,sizes:'192x192',type:'image/png'},{src:i2,sizes:'512x512',type:'image/png',purpose:'any maskable'}]})],{type:'application/manifest+json'}))}catch(e){}})();
+let dp;addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
+function install(){if(dp){dp.prompt();dp=null}else if(matchMedia('(display-mode: standalone)').matches)hud('已在主屏幕');
+ else{$('pan').style.display='none';hud(/iPhone|iPad/.test(navigator.userAgent)?'点底部分享 → 添加到主屏幕':'浏览器菜单 → 添加到主屏幕');showUI()}}
+$('inst').onclick=$('inst2').onclick=install;
+$('play').innerHTML=PL;layout();filt();loop();
+</script></body></html>
