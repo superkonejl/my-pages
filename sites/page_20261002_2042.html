@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>夜醒助眠声音</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="助眠声音">
+<meta name="application-name" content="助眠声音">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#030304">
+<script>
+(function(){try{
+  var c=document.createElement('canvas');c.width=c.height=180;var x=c.getContext('2d');
+  x.fillStyle='#0b0e14';x.fillRect(0,0,180,180);
+  x.fillStyle='#a9b8d6';x.beginPath();x.arc(88,90,44,0,7);x.fill();
+  x.fillStyle='#0b0e14';x.beginPath();x.arc(106,78,40,0,7);x.fill();
+  var u=c.toDataURL('image/png');
+  ['apple-touch-icon','icon'].forEach(function(r){var l=document.createElement('link');l.rel=r;l.href=u;document.head.appendChild(l);});
+  var m={name:'助眠声音',short_name:'助眠声音',display:'standalone',background_color:'#030304',theme_color:'#030304',icons:[{src:u,sizes:'180x180',type:'image/png'}]};
+  var k=document.createElement('link');k.rel='manifest';k.href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify(m));document.head.appendChild(k);
+}catch(e){}})();
+</script>
+<style>
+:root{--bg:#030304;--fg:#8a93a3;--dim:#4a505a;--on:#a9b8d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#030304}}
+:root[data-theme="dark"]{--bg:#030304}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"PingFang SC","Noto Sans SC",sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column}
+#stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;text-align:center;padding:0 24px}
+#name{font-size:38px;font-weight:300;letter-spacing:.08em;color:var(--on);transition:opacity .25s}
+#desc{margin-top:14px;font-size:15px;color:var(--dim);min-height:22px;transition:opacity .25s}
+#state{margin-top:44px;width:76px;height:76px;border-radius:50%;border:1px solid #1d222b;display:flex;align-items:center;justify-content:center}
+#state svg{width:26px;height:26px;fill:var(--fg)}
+#dots{margin-top:36px;display:flex;gap:14px}
+#dots i{width:8px;height:8px;border-radius:50%;background:#1d222b}
+#dots i.on{background:#6b7fa6}
+#hint{margin-top:30px;font-size:13px;color:#343943;line-height:1.8}
+#bar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px 26px}
+#tm{background:none;border:1px solid #1d222b;border-radius:14px;color:var(--fg);font:inherit;font-size:19px;padding:16px 28px;min-width:150px}
+#info{font-size:14px;color:var(--dim);text-align:right;line-height:1.7}
+button:focus-visible{outline:2px solid #5d7099;outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="name">深棕噪音</div>
+    <div id="desc"></div>
+    <div id="state"><svg id="ic" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+    <div id="dots"></div>
+    <div id="hint">轻点：开始 / 暂停<br>左右滑动：换声音　上下滑动：调音量</div>
+  </div>
+  <div id="bar">
+    <button id="tm">60 分钟</button>
+    <div id="info"><div id="rem"></div><div id="volt"></div></div>
+  </div>
+</div>
+<script>
+(function(){
+var S=[
+ {k:'brown',n:'深棕噪音',d:'低沉平稳，压住杂念'},
+ {k:'rain',n:'细雨',d:'柔和的雨声'},
+ {k:'fan',n:'风扇',d:'均匀的低频嗡声'},
+ {k:'wave',n:'海浪',d:'缓慢起伏，十秒一次'}
+];
+var TM=[30,60,90];
+var idx=0,mi=1,vol=0.2,playing=false,ctx=null,master=null,layer=null,tmr=null,tick=null,endAt=0;
+function ld(k,d){try{var v=localStorage.getItem(k);return v===null?d:+v;}catch(e){return d;}}
+function sv(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+idx=ld('idx',0);mi=ld('mi',1);vol=ld('vol',0.2);
+if(!(idx>=0&&idx<S.length))idx=0;if(!(mi>=0&&mi<TM.length))mi=1;if(!(vol>=0.02&&vol<=1))vol=0.2;
+
+var $=function(i){return document.getElementById(i);};
+var dots=$('dots');S.forEach(function(){dots.appendChild(document.createElement('i'));});
+var PLAY='M8 5v14l11-7z',PAUSE='M7 5h3.5v14H7zM13.5 5H17v14h-3.5z';
+
+function ui(){
+  $('name').textContent=S[idx].n;$('desc').textContent=S[idx].d;
+  $('ic').firstChild.setAttribute('d',playing?PAUSE:PLAY);
+  [].forEach.call(dots.children,function(d,i){d.classList.toggle('on',i===idx);});
+  $('tm').textContent=TM[mi]+' 分钟';
+  $('volt').textContent='音量 '+Math.round(vol*100)+'%';
+  $('hint').style.opacity=playing?0.35:1;
+}
+function lvl(){return Math.pow(vol,2)*0.8;}
+
+function init(){
+  if(ctx)return;
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  master=ctx.createGain();master.gain.value=0;master.connect(ctx.destination);
+}
+function noise(type){
+  var sr=ctx.sampleRate,len=sr*20,f=sr*3,tot=len+f,x=new Float32Array(tot),last=0;
+  for(var i=0;i<tot;i++){var w=Math.random()*2-1;
+    if(type==='brown'){last=(last+0.02*w)/1.02;x[i]=last*3.5;}else x[i]=w*0.5;}
+  var b=ctx.createBuffer(1,len,sr),d=b.getChannelData(0);
+  for(var j=0;j<len;j++)d[j]=x[j];
+  for(var m=0;m<f;m++){var t=m/f;d[m]=x[m]*Math.sin(t*Math.PI/2)+x[len+m]*Math.cos(t*Math.PI/2);}
+  var s=ctx.createBufferSource();s.buffer=b;s.loop=true;s.start();return s;
+}
+var cache={};
+function nz(t){return noise(t);}
+function filt(t,f,q){var n=ctx.createBiquadFilter();n.type=t;n.frequency.value=f;if(q)n.Q.value=q;return n;}
+function gn(v){var g=ctx.createGain();g.gain.value=v;return g;}
+function build(k){
+  var out=gn(0),nodes=[out],s;
+  if(k==='brown'){s=nz('brown');var a=filt('lowpass',500);s.connect(a);a.connect(out);nodes.push(s,a);}
+  else if(k==='rain'){
+    s=nz('white');var hp=filt('highpass',1200),lp=filt('lowpass',5500),g=gn(0.35);
+    s.connect(hp);hp.connect(lp);lp.connect(g);g.connect(out);
+    var b=nz('brown'),bl=filt('lowpass',400),bg=gn(0.5);b.connect(bl);bl.connect(bg);bg.connect(out);nodes.push(s,b);
+  }else if(k==='fan'){
+    s=nz('brown');var l3=filt('lowpass',700);s.connect(l3);l3.connect(out);
+    var h=nz('white'),bp=filt('bandpass',900,0.7),hg=gn(0.12);h.connect(bp);bp.connect(hg);hg.connect(out);nodes.push(s,h);
+  }else{
+    s=nz('brown');var l4=filt('lowpass',650),wg=gn(0.55);s.connect(l4);l4.connect(wg);wg.connect(out);
+    var o=ctx.createOscillator(),og=gn(0.4);o.frequency.value=0.1;o.connect(og);og.connect(wg.gain);o.start();
+    var h2=nz('white'),hb=filt('bandpass',1800,0.5),hn=gn(0),o2=ctx.createOscillator(),o2g=gn(0.05);
+    o2.frequency.value=0.1;o2.connect(o2g);o2g.connect(hn.gain);o2.start();h2.connect(hb);hb.connect(hn);hn.connect(out);
+    nodes.push(s,o,h2,o2);
+  }
+  out.connect(master);
+  return {out:out,nodes:nodes};
+}
+function kill(l){
+  setTimeout(function(){l.nodes.forEach(function(n){try{n.stop&&n.stop();}catch(e){}try{n.disconnect();}catch(e){}});},1500);
+}
+function start(){
+  init();ctx.resume();
+  var old=layer;
+  if(old){old.out.gain.cancelScheduledValues(ctx.currentTime);old.out.gain.setTargetAtTime(0,ctx.currentTime,0.25);kill(old);}
+  layer=build(S[idx].k);
+  layer.out.gain.setValueAtTime(0,ctx.currentTime);
+  layer.out.gain.linearRampToValueAtTime(1,ctx.currentTime+(old?1.2:3));
+  master.gain.cancelScheduledValues(ctx.currentTime);
+  master.gain.setTargetAtTime(lvl(),ctx.currentTime,0.3);
+  playing=true;arm();ui();
+}
+function pause(t){
+  playing=false;clearTimeout(tmr);clearInterval(tick);$('rem').textContent='';
+  if(ctx&&master){t=t||1.2;master.gain.cancelScheduledValues(ctx.currentTime);
+    master.gain.setValueAtTime(master.gain.value,ctx.currentTime);
+    master.gain.linearRampToValueAtTime(0,ctx.currentTime+t);
+    var l=layer;layer=null;if(l)kill({nodes:l.nodes,out:l.out});}
+  ui();
+}
+function arm(){
+  clearTimeout(tmr);clearInterval(tick);
+  endAt=Date.now()+TM[mi]*60000;
+  tmr=setTimeout(function(){pause(20);},TM[mi]*60000);
+  var show=function(){$('rem').textContent='剩 '+Math.max(1,Math.round((endAt-Date.now())/60000))+' 分钟';};
+  show();tick=setInterval(show,30000);
+}
+function go(dir){
+  idx=(idx+dir+S.length)%S.length;sv('idx',idx);
+  if(playing){start();}else{ui();}
+  var n=$('name');n.style.opacity=0.2;setTimeout(function(){n.style.opacity=1;},180);
+}
+
+// 手势：轻点开始/暂停，左右滑动换声音，上下滑动调音量
+var st=document.getElementById('stage'),sx=0,sy=0,sv0=0,mode='',down=false;
+st.addEventListener('pointerdown',function(e){down=true;sx=e.clientX;sy=e.clientY;sv0=vol;mode='';try{st.setPointerCapture(e.pointerId);}catch(x){}});
+st.addEventListener('pointermove',function(e){
+  if(!down)return;
+  var dx=e.clientX-sx,dy=e.clientY-sy;
+  if(!mode&&(Math.abs(dx)>14||Math.abs(dy)>14))mode=Math.abs(dx)>Math.abs(dy)?'h':'v';
+  if(mode==='v'){vol=Math.min(1,Math.max(0.02,sv0-dy/350));
+    if(ctx&&playing)master.gain.setTargetAtTime(lvl(),ctx.currentTime,0.05);
+    $('volt').textContent='音量 '+Math.round(vol*100)+'%';}
+});
+function end(e){
+  if(!down)return;down=false;
+  var dx=e.clientX-sx;
+  if(mode==='h'){if(Math.abs(dx)>45)go(dx<0?1:-1);}
+  else if(mode==='v'){sv('vol',vol);}
+  else{if(playing)pause();else start();}
+}
+st.addEventListener('pointerup',end);
+st.addEventListener('pointercancel',function(){down=false;});
+$('tm').addEventListener('click',function(){
+  mi=(mi+1)%TM.length;sv('mi',mi);if(playing)arm();ui();
+});
+ui();
+})();
+</script>
+</body>
+</html>
