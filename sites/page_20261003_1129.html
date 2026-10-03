@@ -1,0 +1,164 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101418"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="中医记忆">
+<title>中医记忆卡</title>
+<style>
+:root{--bg:#101418;--sf:#1a2127;--sf2:#232c34;--tx:#e9eeea;--mu:#8a9a96;--jd:#7fc8a9;--cn:#e07a5f;--bl:#7aa7e0;box-sizing:border-box}
+*{box-sizing:inherit;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 -apple-system,"PingFang SC","Noto Serif SC","Songti SC",sans-serif;overscroll-behavior:none}
+#app{height:100%;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:10px}
+header h1{font-size:22px;margin:0;letter-spacing:2px;font-family:"Songti SC","Noto Serif SC",serif}
+header span{color:var(--mu)}
+button{font:inherit;color:var(--tx);background:var(--sf2);border:0;border-radius:12px;padding:10px 14px;min-height:44px}
+button:active{filter:brightness(1.3)}
+.pri{background:var(--jd);color:#0c1a14;font-weight:700}.bad{color:var(--cn)}
+main{flex:1;overflow:auto;padding:0 10px 100px}
+.row{display:flex;align-items:center;gap:6px;background:var(--sf);border-radius:14px;margin-bottom:6px;min-height:58px;padding-right:4px}
+.row .nm{flex:1;padding:8px 4px;font-size:17px}.row small{display:block;color:var(--mu);font-size:12px}
+.chev{width:28px;text-align:center;color:var(--mu)}
+.n,.d{min-width:30px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}.n{color:var(--bl)}.d{color:var(--cn)}
+.row button{background:none;padding:10px;color:var(--mu);font-size:20px}
+.fab{position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:30px;font-size:30px;background:var(--jd);color:#0c1a14;box-shadow:0 6px 20px #0008;padding:0}
+.bd{position:fixed;inset:0;background:#0009;display:flex;align-items:flex-end;z-index:9}
+.sheet{width:100%;max-height:88%;overflow:auto;background:var(--sf);border-radius:20px 20px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
+.sheet h3{margin:0 0 4px}
+input,select,textarea{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--sf2);border-radius:12px;padding:12px;width:100%}
+textarea{min-height:110px;resize:vertical}
+.bt{display:flex;gap:10px}.bt button{flex:1}
+.cd{flex:1;overflow:auto;padding:16px 22px;display:flex;flex-direction:column;justify-content:center;white-space:pre-wrap;line-height:1.6}
+.cd>div:first-child{margin:auto 0}
+.f{font-weight:700;text-align:center;font-family:"Songti SC","Noto Serif SC",serif}
+.b{color:var(--jd)}hr{border:0;border-top:1px solid var(--sf2);width:100%;margin:18px 0}
+.cz{color:var(--jd);font-weight:700}
+.hint{color:var(--mu);text-align:center;font-size:14px}
+.tools{display:flex;gap:10px;margin:16px 0}.tools button{flex:1}
+#ex{font-size:17px;background:var(--sf);border-radius:14px;padding:14px;margin-bottom:10px;display:none}#ex:not(:empty){display:block}
+.eh{position:sticky;top:0;background:var(--sf);color:var(--jd);font-weight:600;padding:2px 0 8px;font-size:16px}
+footer{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+footer button{flex:1;min-height:64px;font-size:17px;font-weight:600}footer small{display:block;font-size:12px;font-weight:400;opacity:.8}
+.g1{background:#3a2423;color:#f08a7a}.g2{background:#3a3023;color:#f0b87a}.g3{background:#1f3a2c;color:#7fe0a9}.g4{background:#22304a;color:#8fb8f0}
+.cr{background:var(--sf);border-radius:12px;padding:12px;margin-bottom:6px}.cr small{color:var(--mu);display:block;white-space:pre-wrap}
+.tt{position:fixed;left:50%;top:calc(20px + env(safe-area-inset-top));transform:translateX(-50%);background:var(--jd);color:#0c1a14;padding:10px 18px;border-radius:20px;z-index:99;font-weight:600}
+</style></head><body><div id="app"></div><div id="sh"></div>
+<script>
+const $=s=>document.querySelector(s),E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let S;try{S=JSON.parse(localStorage.tcm)}catch(e){}
+S=S||{decks:[],cards:[],cfg:{},n:1,nt:{}};
+const C=S.cfg;C.ret??=.9;C.nd??=20;C.fs??=30;C.auto??=0;C.key??='';
+const save=()=>{try{localStorage.tcm=JSON.stringify(S)}catch(e){toast('存储失败')}};
+const toast=m=>{const t=document.createElement('div');t.className='tt';t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),2200)};
+const CZ=/\{\{c(\d+)::([\s\S]*?)(?:::([\s\S]*?))?\}\}/g,hasCz=t=>/\{\{c\d+::/.test(t);
+const addCard=(f,b,d)=>{const k=[...new Set([...f.matchAll(CZ)].map(m=>+m[1]))];if(!k.length){S.cards.push({id:S.n++,f,b,d,reps:0});return 1}k.forEach(z=>S.cards.push({id:S.n++,f,b,d,reps:0,cz:z}));return k.length};
+const clz=(t,n,sw)=>E(t).replace(CZ,(m,k,a,h)=>+k==n?`<span class=cz>${sw?a:'['+(h||'…')+']'}</span>`:a),strip=t=>t.replace(CZ,(m,k,a)=>a),mark=c=>c.f.replace(CZ,(m,k,a)=>+k==c.cz?'【'+a+'】':a),spk=c=>c.cz?strip(c.f)+(c.b?'。'+c.b:''):c.f+'。'+c.b;
+if(!S.seeded){S.seeded=1;addCard('阴阳的相互关系包括哪些？','对立制约、互根互用、消长平衡、相互转化','中医基础理论::阴阳学说');addCard('五行相克的次序？','木克土，土克水，水克火，火克金，金克木','中医基础理论::五行学说');save()}
+
+/* ===== FSRS-4.5 记忆算法 ===== */
+const WD=[.4872,1.4003,3.7145,13.8206,5.1618,1.2298,.8975,.031,1.6474,.1367,1.0461,2.1072,.0793,.3246,1.587,.2272,2.8755],DAY=864e5,now=()=>Date.now(),cl=(x,a,b)=>Math.min(b,Math.max(a,x));
+let W=C.w&&C.w.length==17?C.w:WD;
+const ini=(w,g)=>[Math.max(.1,w[g-1]),cl(w[4]-w[5]*(g-3),1,10)],rt=(s,dt)=>Math.pow(1+19/81*dt/s,-.5);
+const nxt=(w,s,d,g,r)=>{d=cl(w[7]*w[4]+(1-w[7])*(d-w[6]*(g-3)),1,10);
+ s=g==1?Math.min(s,w[11]*Math.pow(d,-w[12])*(Math.pow(s+1,w[13])-1)*Math.exp((1-r)*w[14])):s*(1+Math.exp(w[8])*(11-d)*Math.pow(s,-w[9])*(Math.exp((1-r)*w[10])-1)*(g==2?w[15]:1)*(g==4?w[16]:1));
+ return[Math.max(.1,s),d]};
+function sch(c,g,t=now()){const n={...c};let s,d;
+ if(!c.reps){[s,d]=ini(W,g)}else{[s,d]=nxt(W,c.s,c.df,g,rt(c.s,(t-c.last)/DAY))}
+ n.s=s;n.df=d;n.reps=(c.reps||0)+1;n.last=t;if(g==1)n.lap=(c.lap||0)+1;
+ n.due=g==1?t+6e4:t+Math.max(1,Math.round(s/(19/81)*(Math.pow(C.ret,-2)-1)))*DAY;return n}
+/* 复习日志 + 参数优化 */
+function seqs(){const m={};(S.log||[]).forEach(([id,g,t,r0])=>{if(m[id]===undefined)m[id]=r0?null:[];const q=m[id];if(!q)return;if(!q.length||t-q[q.length-1][1]>=DAY/2)q.push([g,t])});return Object.values(m).filter(Boolean)}
+const logN=()=>seqs().reduce((a,q)=>a+q.length-1,0);
+function loss(w,Z){let L=0,n=0;for(const q of Z){let[s,d]=ini(w,q[0][0]);for(let i=1;i<q.length;i++){const g=q[i][0],r=cl(rt(s,(q[i][1]-q[i-1][1])/DAY),1e-4,1-1e-4);L-=g>1?Math.log(r):Math.log(1-r);n++;[s,d]=nxt(w,s,d,g,r)}}return[L,n]}
+async function opt(b){const Z=seqs().filter(q=>q.length>1),[L0,n]=loss(W,Z);if(n<300)return toast(`有效复习记录不足（${n}/300）`);
+ const lo=[.01,.01,.01,.01,1,.01,.01,0,0,0,.01,.01,.01,.01,.01,0,1],hi=[100,100,100,100,10,4,4,.75,4.5,.8,3.5,5,.25,.9,4,1,6],sc=WD.map(x=>Math.abs(x)+.1);
+ const F=w=>loss(w,Z)[0]+w.reduce((a,x,i)=>a+5*((x-WD[i])/sc[i])**2,0);let w=[...W],m=w.map(()=>0),v=w.map(()=>0);
+ for(let it=1;it<=120;it++){const f0=F(w),g=w.map((x,i)=>{const h=1e-3*sc[i],w2=[...w];w2[i]=x+h;return(F(w2)-f0)/h});
+  w=w.map((x,i)=>{m[i]=.9*m[i]+.1*g[i];v[i]=.999*v[i]+.001*g[i]*g[i];return cl(x-.03*sc[i]*(m[i]/(1-.9**it))/(Math.sqrt(v[i]/(1-.999**it))+1e-8),lo[i],hi[i])});
+  if(it%6==0){b.textContent=`优化中 ${Math.round(it/1.2)}%`;await new Promise(r=>setTimeout(r))}}
+ const L1=loss(w,Z)[0];b.textContent='优化参数';
+ if(L1>L0*.995)return toast('当前参数已经够准，无需调整');
+ if(confirm(`基于 ${n} 次复习，预测误差（越低越准）：${(L0/n).toFixed(3)} → ${(L1/n).toFixed(3)}。\n应用新参数？`)){C.w=w;W=w;save();settings();toast('已应用个性化参数')}}
+const rsw=()=>{C.w=null;W=WD;save();settings();toast('已恢复默认参数')};
+const fi=(c,g)=>{const t=sch(c,g).due-now();if(t<DAY/2)return'1分';const d=Math.round(t/DAY);return d<30?d+'天':d<365?(d/30).toFixed(1)+'月':(d/365).toFixed(1)+'年'};
+
+/* ===== 牌组 ===== */
+const inD=(c,p)=>c.d==p||c.d.startsWith(p+'::'),today=()=>new Date().toDateString(),newLeft=()=>Math.max(0,C.nd-(S.nt[today()]||0));
+const allD=()=>{const s=new Set();[...S.decks,...S.cards.map(c=>c.d)].forEach(d=>{const p=d.split('::');for(let i=1;i<=p.length;i++)s.add(p.slice(0,i).join('::'))});return[...s].sort((a,b)=>a.localeCompare(b,'zh'))};
+const cnt=p=>{let n=0,d=0,t=now();S.cards.forEach(c=>{if(!inD(c,p))return;if(!c.reps)n++;else if(c.due<=t)d++});return[Math.min(n,newLeft()),d]};
+let V='home',DS=[],open=new Set(allD()),Q=[],cur=null,shown=0,SP='',BP='';
+const sh=h=>{$('#sh').innerHTML=h?`<div class=bd onclick="if(event.target==this)sh()"><div class=sheet>${h}</div></div>`:''};
+const refresh=()=>V=='home'?home():V=='br'?browse(BP):0;
+
+function home(){V='home';DS=allD();
+ const vis=DS.map((d,i)=>[d,i]).filter(([d])=>{const p=d.split('::');for(let i=1;i<p.length;i++)if(!open.has(p.slice(0,i).join('::')))return false;return true});
+ $('#app').innerHTML=`<header><h1>中医记忆卡</h1><button onclick=settings()>⚙︎</button></header><main>${vis.length?vis.map(([d,i])=>{const p=d.split('::'),k=DS.some(x=>x.startsWith(d+'::')),[n,du]=cnt(d);
+  return`<div class=row style="margin-left:${(p.length-1)*16}px"><b class=chev onclick="tg(${i})">${k?open.has(d)?'▾':'▸':''}</b><div class=nm onclick="study(${i})">${E(p.pop())}<small>共 ${S.cards.filter(c=>inD(c,d)).length} 张</small></div><span class=n>${n}</span><span class=d>${du}</span><button onclick="dm(${i})">⋯</button></div>`}).join(''):'<p class=hint>还没有牌组，点右下角 ＋ 新建或导入</p>'}</main><button class=fab onclick=am()>＋</button>`}
+const tg=i=>{const d=DS[i];open.has(d)?open.delete(d):open.add(d);home()};
+const am=()=>sh(`<h3>添加</h3><button onclick="ed(0)">✎ 添加单张卡片</button><button onclick="nd('')">🗂 新建牌组</button><button onclick="im(-1)">⇪ 批量导入 / AI 生成卡片</button>`);
+const dm=i=>sh(`<h3>${E(DS[i])}</h3><button onclick="sh();study(${i})">开始学习</button><button onclick="sh();browse(DS[${i}])">浏览 / 编辑卡片</button><button onclick="ed(0,${i})">添加卡片到此牌组</button><button onclick="nd(DS[${i}])">新建子牌组</button><button onclick="im(${i})">导入到此牌组</button><button onclick="rn(${i})">重命名 / 移动</button><button class=bad onclick="dl(${i})">删除牌组</button>`);
+function nd(p){const n=prompt(p?'子牌组名称':'牌组名称（可用 :: 表示层级，如 方剂学::解表剂）');if(!n)return;const f=(p?p+'::':'')+n.trim().replace(/[:：]{2}/g,'::');if(!S.decks.includes(f))S.decks.push(f);open.add(p);save();sh();home()}
+function rn(i){const o=DS[i],n=prompt('新的完整路径（改层级即可移动）',o);if(!n||n==o)return;const f=x=>x==o?n:x.startsWith(o+'::')?n+x.slice(o.length):x;S.decks=S.decks.map(f);S.cards.forEach(c=>c.d=f(c.d));open=new Set(allD());save();sh();home()}
+function dl(i){const o=DS[i],k=S.cards.filter(c=>inD(c,o)).length;if(!confirm(`删除「${o}」及其子牌组，共 ${k} 张卡片？`))return;S.decks=S.decks.filter(x=>!(x==o||x.startsWith(o+'::')));S.cards=S.cards.filter(c=>!inD(c,o));save();sh();home()}
+
+/* ===== 卡片增改 / 浏览 ===== */
+function ed(id,i){const c=id?S.cards.find(x=>x.id==id):{f:'',b:'',d:i!=null?DS[i]:(BP||DS[0]||'默认牌组')},L=allD();if(!L.includes(c.d))L.push(c.d);
+ sh(`<h3>${id?'编辑卡片':'添加卡片'}</h3><select id=e_d>${L.map(x=>`<option ${x==c.d?'selected':''}>${E(x)}</option>`).join('')}</select><textarea id=e_f placeholder="正面（问题）；填空卡写成 {{c1::答案}}">${E(c.f)}</textarea><div class=bt><button onclick="mk(1)">挖空·新卡</button><button onclick="mk(0)">挖空·同卡</button></div><textarea id=e_b placeholder="背面（答案）；填空卡可留空，作补充说明">${E(c.b)}</textarea><div class=bt>${id?`<button class=bad onclick="cd(${id})">删除</button>`:''}<button class=pri onclick="sv(${id||0})">${id?'保存':'保存并继续添加'}</button></div>`)}
+function sv(id){const f=$('#e_f').value.trim(),b=$('#e_b').value.trim(),d=$('#e_d').value;if(!f||(!b&&!hasCz(f)))return toast('正反面都要填写（填空卡可不写背面）');
+ if(id){const c=S.cards.find(x=>x.id==id),o=c.f,od=c.d;if(!c.cz&&hasCz(f)){S.cards=S.cards.filter(x=>x!=c);addCard(f,b,d)}else{S.cards.forEach(x=>{if(x.cz&&x.f==o&&x.d==od)Object.assign(x,{f,b,d})});Object.assign(c,{f,b,d});if(!hasCz(f))delete c.cz}sh()}else{addCard(f,b,d);$('#e_f').value=$('#e_b').value='';$('#e_f').focus();toast('已添加')}save();refresh()}
+function mk(nw){const t=$('#e_f'),a=t.selectionStart,e=t.selectionEnd;if(a==e)return toast('先在正面选中要挖空的文字');const mx=Math.max(0,...[...t.value.matchAll(CZ)].map(m=>+m[1])),k=nw?mx+1:Math.max(1,mx);t.setRangeText(`{{c${k}::${t.value.slice(a,e)}}}`,a,e,'end');t.focus()}
+const cd=id=>{if(confirm('删除这张卡片？')){S.cards=S.cards.filter(x=>x.id!=id);save();sh();refresh()}};
+function browse(p,q=''){V='br';BP=p;const L=S.cards.filter(c=>inD(c,p)&&(c.f+c.b).includes(q));
+ $('#app').innerHTML=`<header><button onclick=home()>‹ 返回</button><span>${E(p.split('::').pop())} · ${L.length}</span><button onclick="ed(0)">＋</button></header><div style="padding:0 12px 8px"><input placeholder="搜索" value="${E(q)}" onchange="browse(BP,this.value)"></div><main>${L.map(c=>`<div class=cr onclick="ed(${c.id})">${c.cz?clz(c.f,c.cz,0):E(c.f)}<small>${E(c.b)}</small></div>`).join('')||'<p class=hint>没有卡片</p>'}</main>`}
+
+/* ===== 学习 ===== */
+function study(i){const p=DS[i];SP=p;const t=now()+6e4,du=S.cards.filter(c=>inD(c,p)&&c.reps&&c.due<=t).sort((a,b)=>a.due-b.due),nw=S.cards.filter(c=>inD(c,p)&&!c.reps).slice(0,newLeft());
+ Q=[...du,...nw].map(c=>c.id);if(!Q.length)return toast('今天没有需要复习的卡片 🎉');V='st';shown=0;card()}
+function card(){if(!Q.length){toast('本次学习完成 ✅');return ex()}cur=S.cards.find(c=>c.id==Q[0]);exo=0;
+ $('#app').innerHTML=`<header><button onclick=ex()>✕</button><span>${E(SP.split('::').pop())}</span><span>剩 ${Q.length}</span></header>
+<div class=cd onclick="if(!shown)rv()"><div class=f style="font-size:${C.fs}px">${cur.cz?clz(cur.f,cur.cz,shown):E(cur.f)}</div>${shown?`${cur.cz&&!cur.b?'':`<hr><div class=b style="font-size:${C.fs*.85}px">${E(cur.b)}</div>`}<div class=tools><button onclick="sp(spk(cur))">🔊 朗读</button><button onclick=ai()>✨ ${cur.ex?'重新解释':'AI 解释'}</button></div><div id=ex>${cur.ex?exh():''}</div>`:'<p class=hint>点击屏幕显示答案</p>'}</div>
+<footer>${shown?[1,2,3,4].map(g=>`<button class=g${g} onclick=gr(${g})>${['重来','困难','良好','简单'][g-1]}<small>${fi(cur,g)}</small></button>`).join(''):'<button class=pri onclick=rv()>显示答案</button>'}</footer>`}
+let exo=0;const exh=()=>`<div class=eh onclick=tx()>${exo?'▾ AI 解释（点此折叠）':'▸ AI 解释（点此展开）'}</div>${exo?`<div>${md(cur.ex)}</div>`:''}`,tx=()=>{exo=!exo;$('#ex').innerHTML=exh()};
+const rv=()=>{shown=1;card();if(C.auto)sp(cur.cz?spk(cur):cur.b)};
+function gr(g){speechSynthesis.cancel();(S.log=S.log||[]).push([cur.id,g,now(),cur.reps?1:0]);if(S.log.length>30000)S.log=S.log.slice(-30000);const i=S.cards.findIndex(c=>c.id==cur.id);if(!cur.reps)S.nt[today()]=(S.nt[today()]||0)+1;S.cards[i]=sch(cur,g);Q.shift();if(g==1)Q.splice(Math.min(Q.length,4),0,cur.id);shown=0;save();card()}
+const ex=()=>{speechSynthesis.cancel();home()};
+function sp(t){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='zh-CN';u.rate=.9;speechSynthesis.speak(u)}
+const md=t=>E(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/^#+\s*/gm,'').replace(/\n/g,'<br>');
+
+/* ===== DeepSeek ===== */
+async function ds(m){if(!C.key){settings();throw Error('请先填写 DeepSeek API Key')}
+ const r=await fetch('https://api.deepseek.com/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+C.key},body:JSON.stringify({model:'deepseek-chat',messages:m,temperature:.3})});
+ if(!r.ok)throw Error('HTTP '+r.status);return(await r.json()).choices[0].message.content}
+async function ai(){const el=$('#ex');el.innerHTML='<i>AI 思考中…</i>';
+ try{const c=cur,t=await ds([{role:'system',content:'你是资深中医执业医师考试辅导老师，回答准确、简洁、条理清晰。'},{role:'user',content:`${c.cz?'知识点（【】内是考点）：'+mark(c)+(c.b?'\n补充：'+c.b:''):'题目：'+c.f+'\n答案：'+c.b}\n\n请详细解释：1）为什么是这个答案（机理/出处）；2）记忆口诀或联想；3）易混淆点对比；4）高频考点。`}]);c.ex=t;save();if(cur==c){exo=1;el.innerHTML=exh()}}catch(e){el.textContent='失败：'+e.message}}
+
+/* ===== 导入 ===== */
+function im(i){const d=i>=0?DS[i]:'';sh(`<h3>导入卡片</h3><select id=i_d>${['',...allD()].map(x=>`<option value="${E(x)}" ${x==d?'selected':''}>${x?E(x):'（按第3列 / #deck: 指定，否则放入「默认牌组」）'}</option>`).join('')}</select><textarea id=i_t rows=7 placeholder="每行一张：正面 [Tab 或 | 或 ; 或 ,] 背面 [可选：第3列牌组名]\n自动识别分隔符，支持 Anki 导出的文本、CSV、备份 JSON。填空卡写成 {{c1::关键词}}，一行即可。\n也可粘贴零散笔记，点「AI 生成」自动出题。"></textarea><input type=file accept=".txt,.csv,.tsv,.json" onchange="rf(this)"><div class=bt><button id=i_a onclick=aig()>✨ AI 生成</button><button class=pri onclick=doim()>导入</button></div>`)}
+const rf=el=>{const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>$('#i_t').value=r.result;r.readAsText(f)};
+function doim(){const t=$('#i_t').value.trim(),td=$('#i_d').value;if(!t)return;
+ if(t[0]=='{'){try{const j=JSON.parse(t);if(!j.cards)throw 0;if(!confirm('将覆盖当前全部数据，确定恢复备份？'))return;j.cfg=Object.assign(j.cfg||{},{key:C.key});localStorage.tcm=JSON.stringify(j);location.reload()}catch(e){toast('备份格式不对')}return}
+ let dd=td,sp=null,n=0;
+ for(const l0 of t.split(/\r?\n/)){const l=l0.trim();if(!l)continue;const m=l.match(/^#\s*deck\s*[:：]\s*(.+)/i);if(m){dd=m[1].trim();continue}if(l[0]=='#')continue;
+  const zl=hasCz(l);let dl;if(zl)dl=['\t','|','｜'].find(x=>l.includes(x));else{sp=sp||['\t','|','｜','；',';',','].find(x=>l.includes(x));dl=sp}if(!dl&&!zl)continue;
+  const p=(dl?l.split(dl):[l]).map(x=>x.trim().replace(/^"|"$/g,'').replace(/<br\s*\/?>/gi,'\n'));if(!p[0]||(!p[1]&&!zl))continue;
+  const d=p[2]||dd||'默认牌组';if(S.cards.some(c=>c.d==d&&c.f==p[0]))continue;n+=addCard(p[0],p[1]||'',d)}
+ save();sh();toast(`已导入 ${n} 张`);open=new Set(allD());refresh()}
+async function aig(){const t=$('#i_t').value.trim(),d=$('#i_d').value||'默认牌组';if(!t)return toast('先粘贴笔记内容');const b=$('#i_a');b.textContent='生成中…';b.disabled=1;
+ try{const r=await ds([{role:'user',content:`把下面的中医笔记整理成适合记忆的卡片，每张只考一个知识点。概念理解类用问答；列举、术语、数字类用填空：在 f 中用 {{c1::关键词}} 标出要填的词（同一张卡多个空用同一编号，不同卡用 c2、c3），b 留空或写简短补充。只输出 JSON 数组：[{"f":"问题或填空句","b":"答案"}]\n\n${t}`}]);
+  const a=JSON.parse(r.match(/\[[\s\S]*\]/)[0]);let k=0;a.forEach(x=>{if(x.f&&(x.b||hasCz(String(x.f))))k+=addCard(String(x.f),String(x.b||''),d)});save();sh();toast(`AI 生成 ${k} 张`);open=new Set(allD());refresh()}
+ catch(e){toast('生成失败：'+e.message);b.textContent='✨ AI 生成';b.disabled=0}}
+
+/* ===== 设置 ===== */
+const settings=()=>sh(`<h3>设置</h3><label>DeepSeek API Key</label><input type=password value="${E(C.key)}" placeholder="sk-..." oninput="C.key=this.value.trim();save()">
+<label>目标记忆保留率</label><select onchange="C.ret=+this.value;save()">${[.8,.85,.9,.95].map(x=>`<option value=${x} ${x==C.ret?'selected':''}>${x*100}%${x==.9?'（推荐）':''}</option>`).join('')}</select>
+<label>每日新卡上限</label><input type=number value=${C.nd} oninput="C.nd=+this.value||0;save()">
+<label>卡片字号</label><input type=range min=20 max=48 value=${C.fs} oninput="C.fs=+this.value;save()">
+<label><input type=checkbox style="width:auto" ${C.auto?'checked':''} onchange="C.auto=this.checked?1:0;save()"> 显示答案时自动朗读</label>
+<label>记忆参数：${C.w?'已个性化':'默认'}，已记录 ${logN()} 次有效复习（≥300 次可优化）</label><div class=bt><button onclick="opt(this)">优化参数</button>${C.w?'<button onclick=rsw()>恢复默认</button>':''}</div><button onclick=xp()>导出备份（不含 Key）</button>`);
+function xp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,cfg:{...C,key:''}})],{type:'application/json'}));a.download='tcm-backup.json';a.click()}
+
+/* ===== PWA 图标与清单 ===== */
+try{const cv=document.createElement('canvas');cv.width=cv.height=180;const x=cv.getContext('2d');x.fillStyle='#101418';x.fillRect(0,0,180,180);x.fillStyle='#7fc8a9';x.font='bold 120px serif';x.textAlign='center';x.textBaseline='middle';x.fillText('医',90,98);
+ const u=cv.toDataURL(),l=document.createElement('link');l.rel='apple-touch-icon';l.href=u;document.head.append(l);
+ const m=document.createElement('link');m.rel='manifest';m.href=URL.createObjectURL(new Blob([JSON.stringify({name:'中医记忆卡',short_name:'中医记忆',display:'standalone',background_color:'#101418',theme_color:'#101418',start_url:location.href,icons:[{src:u,sizes:'180x180',type:'image/png'}]})],{type:'application/json'}));document.head.append(m)}catch(e){}
+home();
+</script></body></html>
