@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>俄罗斯方块 Tetris Mobile</title>
+  
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="俄罗斯方块">
+  <meta name="theme-color" content="#0a0c16">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    // 动态生成 PWA Manifest 与高清 SVG App 图标
+    (function initPWA() {
+      const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="128" fill="#0d1124"/>
+        <rect x="96" y="96" width="140" height="140" rx="18" fill="#00f3ff"/>
+        <rect x="256" y="96" width="140" height="140" rx="18" fill="#bc13fe"/>
+        <rect x="256" y="256" width="140" height="140" rx="18" fill="#ff0055"/>
+        <rect x="96" y="256" width="140" height="140" rx="18" fill="#ffe600"/>
+      </svg>`;
+      const iconUrl = 'data:image/svg+xml;base64,' + btoa(svgIcon);
+
+      const linkIcon = document.createElement('link');
+      linkIcon.rel = 'apple-touch-icon';
+      linkIcon.href = iconUrl;
+      document.head.appendChild(linkIcon);
+
+      const linkFavicon = document.createElement('link');
+      linkFavicon.rel = 'icon';
+      linkFavicon.type = 'image/svg+xml';
+      linkFavicon.href = iconUrl;
+      document.head.appendChild(linkFavicon);
+
+      const manifestObj = {
+        name: "俄罗斯方块 Mobile",
+        short_name: "俄罗斯方块",
+        start_url: window.location.href,
+        display: "standalone",
+        background_color: "#0a0c16",
+        theme_color: "#0a0c16",
+        icons: [{ src: iconUrl, sizes: "512x512", type: "image/svg+xml" }]
+      };
+      const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/json' });
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = URL.createObjectURL(manifestBlob);
+      document.head.appendChild(manifestLink);
+    })();
+  </script>
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 20%, #151933 0%, #070913 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      touch-action: none;
+    }
+    /* 霓虹发光与磨砂质感 */
+    .neon-border {
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.25), inset 0 0 10px rgba(0, 243, 255, 0.1);
+    }
+    .neon-text {
+      text-shadow: 0 0 8px rgba(0, 243, 255, 0.7);
+    }
+    .btn-press:active {
+      transform: scale(0.92);
+      filter: brightness(1.25);
+    }
+    /* 虚拟按键触感优化 */
+    .touch-btn {
+      touch-action: none;
+      transition: transform 0.08s ease, background 0.08s ease;
+    }
+    /* 隐藏滚动条 */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="flex flex-col text-slate-100 overflow-hidden select-none safe-top safe-bottom">
+
+  <header class="flex items-center justify-between px-3 py-2 border-b border-slate-800/80 bg-slate-950/60 backdrop-blur shrink-0 z-20">
+    <div class="flex items-center space-x-2">
+      <span class="text-lg font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-pink-400 to-amber-300">
+        TETRIS
+      </span>
+      <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 font-mono font-bold">
+        PRO
+      </span>
+    </div>
+
+    <!-- 顶部状态切换按钮 -->
+    <div class="flex items-center space-x-2">
+      <!-- 添加到桌面提示按钮 -->
+      <button id="btnPwa" class="flex items-center space-x-1 px-2 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-xs text-amber-300 active:scale-95 transition" title="添加到手机主屏幕">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="text-[11px] font-semibold">加到桌面</span>
+      </button>
+
+      <!-- 震动切换 -->
+      <button id="btnHaptic" class="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-300 active:scale-95 transition">
+        <svg id="iconVibrate" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+      </button>
+
+      <!-- 声音切换 -->
+      <button id="btnSound" class="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-300 active:scale-95 transition">
+        <svg id="iconSoundOn" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+        </svg>
+        <svg id="iconSoundOff" class="w-4 h-4 hidden text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+        </svg>
+      </button>
+
+      <!-- 暂停/继续 -->
+      <button id="btnPause" class="w-8 h-8 rounded-full bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-300 active:scale-95 transition">
+        <svg id="iconPause" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"/></svg>
+        <svg id="iconPlay" class="w-4 h-4 hidden text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center p-2 relative overflow-hidden min-h-0">
+    <div class="flex items-start justify-center gap-3 w-full max-w-sm h-full max-h-full">
+      
+      <!-- 俄罗斯方块 10x20 主画布区域 (包含触摸滑动监听) -->
+      <div id="boardContainer" class="relative flex items-center justify-center h-full rounded-xl overflow-hidden p-1 border-2 border-cyan-500/40 bg-slate-950/80 neon-border shadow-2xl">
+        <canvas id="tetrisCanvas" class="block rounded"></canvas>
+
+        <!-- 游戏暂停提示覆层 -->
+        <div id="pauseOverlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm hidden flex-col items-center justify-center z-10 space-y-4">
+          <div class="text-2xl font-black text-cyan-400 tracking-widest neon-text">PAUSED</div>
+          <p class="text-xs text-slate-400">已暂停，点击继续回到对局</p>
+          <button id="btnResume" class="px-6 py-2.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 font-bold text-white shadow-lg active:scale-95 transition">
+            继续对局
+          </button>
+        </div>
+      </div>
+
+      <!-- 右侧信息栏 (下一个方块预览、得分、消除行、最高分) -->
+      <aside class="w-24 shrink-0 flex flex-col gap-2 h-full justify-between py-1 text-center font-mono">
+        
+        <!-- 下一个方块预览 -->
+        <div class="rounded-xl border border-slate-800 bg-slate-900/90 p-2 shadow-md">
+          <div class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider mb-1">NEXT</div>
+          <div class="flex items-center justify-center">
+            <canvas id="nextCanvas" width="80" height="80" class="block"></canvas>
+          </div>
+        </div>
+
+        <!-- 当前分数 -->
+        <div class="rounded-xl border border-slate-800 bg-slate-900/90 p-2 shadow-md flex-1 flex flex-col justify-center">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wider">SCORE</div>
+          <div id="scoreDisplay" class="text-base font-extrabold text-amber-300 truncate">0</div>
+        </div>
+
+        <!-- 消除行数 & 等级 -->
+        <div class="rounded-xl border border-slate-800 bg-slate-900/90 p-2 shadow-md">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wider">LINES</div>
+          <div id="linesDisplay" class="text-sm font-bold text-emerald-400">0</div>
+          <div class="text-[9px] text-slate-500 mt-1 uppercase">LEVEL <span id="levelDisplay" class="text-slate-300 font-bold">1</span></div>
+        </div>
+
+        <!-- 本地最高纪录 -->
+        <div class="rounded-xl border border-slate-800 bg-slate-900/90 p-2 shadow-md">
+          <div class="text-[10px] text-purple-400 uppercase tracking-wider">BEST</div>
+          <div id="highScoreDisplay" class="text-xs font-bold text-purple-300 truncate">0</div>
+        </div>
+
+      </aside>
+    </div>
+  </main>
+
+  <footer class="shrink-0 w-full px-4 pt-1 pb-4 bg-slate-950/90 border-t border-slate-800/80 backdrop-blur z-20">
+    <div class="max-w-md mx-auto grid grid-cols-5 gap-2.5 items-center justify-items-center">
+      
+      <!-- 左移 -->
+      <button id="ctrlLeft" class="touch-btn btn-press w-full h-14 rounded-2xl bg-slate-800/90 border-2 border-slate-700/80 text-cyan-400 flex items-center justify-center shadow-lg active:bg-cyan-600 active:text-white" aria-label="左移">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+
+      <!-- 软下落 -->
+      <button id="ctrlDown" class="touch-btn btn-press w-full h-14 rounded-2xl bg-slate-800/90 border-2 border-slate-700/80 text-cyan-400 flex items-center justify-center shadow-lg active:bg-cyan-600 active:text-white" aria-label="向下慢移">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+
+      <!-- 右移 -->
+      <button id="ctrlRight" class="touch-btn btn-press w-full h-14 rounded-2xl bg-slate-800/90 border-2 border-slate-700/80 text-cyan-400 flex items-center justify-center shadow-lg active:bg-cyan-600 active:text-white" aria-label="右移">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <!-- 旋转 (顺时针) -->
+      <button id="ctrlRotate" class="touch-btn btn-press w-full h-14 rounded-2xl bg-gradient-to-br from-indigo-700 to-purple-800 border-2 border-purple-400/50 text-white flex items-center justify-center shadow-lg active:scale-95" aria-label="旋转">
+        <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      </button>
+
+      <!-- 硬降 (直接到底并锁定) -->
+      <button id="ctrlHardDrop" class="touch-btn btn-press w-full h-14 rounded-2xl bg-gradient-to-br from-amber-600 to-rose-600 border-2 border-rose-400/60 text-white flex flex-col items-center justify-center shadow-lg active:scale-95" aria-label="硬降瞬间锁定">
+        <svg class="w-6 h-6 -mb-1" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 13l-7 7-7-7m14-8l-7 7-7-7"/></svg>
+        <span class="text-[9px] font-black uppercase tracking-tighter">SLAM</span>
+      </button>
+
+    </div>
+  </footer>
+
+  <!-- 游戏结束弹窗 -->
+  <div id="gameOverModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+    <div class="w-full max-w-xs bg-slate-900 border-2 border-rose-500/50 rounded-2xl p-6 text-center shadow-2xl space-y-4">
+      <div class="text-3xl font-black text-rose-500 tracking-wider">GAME OVER</div>
+      <div id="newRecordBadge" class="hidden text-xs py-1 px-3 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full font-bold inline-block">
+        🎉 刷新最高纪录！
+      </div>
+      
+      <div class="bg-slate-950/60 rounded-xl p-3 border border-slate-800 space-y-2 font-mono">
+        <div class="flex justify-between items-center text-xs text-slate-400">
+          <span>最终得分</span>
+          <span id="finalScore" class="text-lg font-bold text-amber-300">0</span>
+        </div>
+        <div class="flex justify-between items-center text-xs text-slate-400">
+          <span>消除行数</span>
+          <span id="finalLines" class="text-sm font-semibold text-emerald-400">0</span>
+        </div>
+        <div class="flex justify-between items-center text-xs text-slate-400">
+          <span>历史最高分</span>
+          <span id="modalHighScore" class="text-sm font-semibold text-purple-300">0</span>
+        </div>
+      </div>
+
+      <button id="btnRestart" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 font-extrabold text-white text-base shadow-lg shadow-cyan-500/30 active:scale-95 transition">
+        重新开始对局
+      </button>
+    </div>
+  </div>
+
+  <!-- 添加到桌面指引弹窗 (针对 iOS 和 Android) -->
+  <div id="pwaModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-2xl p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <span>📱</span> 添加到手机桌面享受全屏原生感
+        </h3>
+        <button id="btnClosePwa" class="text-slate-400 hover:text-white p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="text-xs text-slate-300 space-y-3 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+        <div class="flex items-start gap-2">
+          <span class="text-cyan-400 font-bold">🍏 iOS (Safari)：</span>
+          <div>
+            1. 点击底部菜单栏的<strong>分享图标</strong>（带有向上箭头的方框 ⎋）<br>
+            2. 向上滑动列表，轻点<strong>「添加到主屏幕」</strong><br>
+            3. 点右上角「添加」，即可像原生 App 一样全屏无地址栏畅玩！
+          </div>
+        </div>
+        <div class="border-t border-slate-800 pt-2 flex items-start gap-2">
+          <span class="text-emerald-400 font-bold">🤖 Android (Chrome)：</span>
+          <div>
+            1. 点击右上角菜单<strong>「⋮」</strong><br>
+            2. 选择<strong>「添加到主屏幕」</strong>或<strong>「安装应用」</strong>。
+          </div>
+        </div>
+      </div>
+
+      <button id="btnPwaConfirm" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold active:scale-95 transition">
+        我知道了
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /* ========================================================================
+       1. 音效系统 (Pure Web Audio API 实时合成，零外部依赖，极速无延迟)
+       ======================================================================== */
+    class RetroSoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      initCtx() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type, duration, gainStart = 0.15, gainEnd = 0.001) {
+        if (!this.enabled) return;
+        this.initCtx();
+        if (!this.ctx) return;
+
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const now = this.ctx.currentTime;
+
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+
+          gain.gain.setValueAtTime(gainStart, now);
+          gain.gain.exponentialRampToValueAtTime(gainEnd, now + duration);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now);
+          osc.stop(now + duration);
+        } catch (e) {
+          // 容错处理
+        }
+      }
+
+      // 方块横向移动音效
+      playMove() {
+        this.playTone(240, 'triangle', 0.04, 0.08);
+      }
+
+      // 方块旋转音效
+      playRotate() {
+        if (!this.enabled) return;
+        this.initCtx();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(560, now + 0.06);
+
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.06);
+        } catch(e){}
+      }
+
+      // 落地/下落锁定音效
+      playLock() {
+        this.playTone(130, 'square', 0.06, 0.12);
+      }
+
+      // 普通消除 1~3 行音效
+      playClear() {
+        if (!this.enabled) return;
+        this.initCtx();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        [440, 660].forEach((freq, idx) => {
+          setTimeout(() => {
+            this.playTone(freq, 'triangle', 0.1, 0.15);
+          }, idx * 70);
+        });
+      }
+
+      // 4行满消 (Tetris) 华丽大和弦音效
+      playTetris() {
+        if (!this.enabled) return;
+        this.initCtx();
+        if (!this.ctx) return;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            this.playTone(freq, 'sine', 0.18, 0.2);
+          }, idx * 60);
+        });
+      }
+
+      // 游戏结束低沉音
+      playGameOver() {
+        if (!this.enabled) return;
+        this.initCtx();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [380, 310, 240, 150];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            this.playTone(freq, 'sawtooth', 0.15, 0.14);
+          }, idx * 110);
+        });
+      }
+    }
+
+    /* ========================================================================
+       2. 触感震动反馈系统 (navigator.vibrate)
+       ======================================================================== */
+    class HapticEngine {
+      constructor() {
+        this.enabled = true;
+        this.supported = typeof navigator !== 'undefined' && 'vibrate' in navigator;
+      }
+
+      vibrate(pattern) {
+        if (!this.enabled || !this.supported) return;
+        try {
+          navigator.vibrate(pattern);
+        } catch (e) {
+          // 移动设备权限或后台保护
+        }
+      }
+
+      // 微短震 (移动与旋转)
+      tick() {
+        this.vibrate(12);
+      }
+
+      // 敲击强震 (方块砸落/锁定)
+      thud() {
+        this.vibrate(35);
+      }
+
+      // 消行节奏震动
+      lineClear(lines) {
+        if (lines >= 4) {
+          // 四连消超爽律动震动
+          this.vibrate([40, 50, 40, 50, 90]);
+        } else {
+          this.vibrate([30, 40, 30]);
+        }
+      }
+
+      // 游戏结束长震
+      gameOver() {
+        this.vibrate([100, 60, 180]);
+      }
+    }
+
+    /* ========================================================================
+       3. 经典方块数据结构与 7-bag 洗牌发牌算法
+       ======================================================================== */
+    const COLS = 10;
+    const ROWS = 20;
+
+    // 7 种经典俄罗斯方块定义 (I, J, L, O, S, T, Z)
+    const SHAPES = {
+      I: {
+        color: '#00f3ff', // 荧光蓝绿
+        matrix: [
+          [0, 0, 0, 0],
+          [1, 1, 1, 1],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0]
+        ]
+      },
+      J: {
+        color: '#2979ff', // 经典深蓝
+        matrix: [
+          [1, 0, 0],
+          [1, 1, 1],
+          [0, 0, 0]
+        ]
+      },
+      L: {
+        color: '#ff9100', // 荧光橙
+        matrix: [
+          [0, 0, 1],
+          [1, 1, 1],
+          [0, 0, 0]
+        ]
+      },
+      O: {
+        color: '#ffd600', // 荧光黄
+        matrix: [
+          [1, 1],
+          [1, 1]
+        ]
+      },
+      S: {
+        color: '#00e676', // 荧光翠绿
+        matrix: [
+          [0, 1, 1],
+          [1, 1, 0],
+          [0, 0, 0]
+        ]
+      },
+      T: {
+        color: '#d500f9', // 霓虹紫
+        matrix: [
+          [0, 1, 0],
+          [1, 1, 1],
+          [0, 0, 0]
+        ]
+      },
+      Z: {
+        color: '#ff1744', // 霓虹红
+        matrix: [
+          [1, 1, 0],
+          [0, 1, 1],
+          [0, 0, 0]
+        ]
+      }
+    };
+
+    const PIECE_TYPES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+
+    // 7-Bag 洗牌发牌机制保证公平体验
+    class PieceBag {
+      constructor() {
+        this.bag = [];
+      }
+      next() {
+        if (this.bag.length === 0) {
+          this.bag = [...PIECE_TYPES];
+          // Fisher-Yates 洗牌
+          for (let i = this.bag.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+          }
+        }
+        return this.bag.pop();
+      }
+    }
+
+    /* ========================================================================
+       4. 游戏引擎与渲染核心
+       ======================================================================== */
+    const soundEngine = new RetroSoundEngine();
+    const hapticEngine = new HapticEngine();
+    const bag = new PieceBag();
+
+    // 画布与 DOM 元素
+    const canvas = document.getElementById('tetrisCanvas');
+    const ctx = canvas.getContext('2d');
+    const nextCanvas = document.getElementById('nextCanvas');
+    const nextCtx = nextCanvas.getContext('2d');
+    const boardContainer = document.getElementById('boardContainer');
+
+    // UI 显示数值
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const linesDisplay = document.getElementById('linesDisplay');
+    const levelDisplay = document.getElementById('levelDisplay');
+    const highScoreDisplay = document.getElementById('highScoreDisplay');
+    const finalScoreEl = document.getElementById('finalScore');
+    const finalLinesEl = document.getElementById('finalLines');
+    const modalHighScoreEl = document.getElementById('modalHighScore');
+    const newRecordBadge = document.getElementById('newRecordBadge');
+    const gameOverModal = document.getElementById('gameOverModal');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+
+    // 游戏核心运行时状态
+    let grid = createGrid();
+    let currentPiece = null;
+    let nextPieceType = null;
+    let blockSize = 24; // 动态计算以完美铺满屏幕
+    let dropInterval = 850; // 下落基础毫秒
+    let lastDropTime = 0;
+    let isGameOver = false;
+    let isPaused = false;
+    let score = 0;
+    let lines = 0;
+    let level = 1;
+    let highScore = parseInt(localStorage.getItem('tetris_high_score') || '0', 10);
+    let animFrameId = null;
+
+    highScoreDisplay.textContent = highScore;
+
+    function createGrid() {
+      return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    }
+
+    // 动态依据容器尺寸计算最高清晰度 Canvas 大小
+    function resizeCanvas() {
+      const rect = boardContainer.getBoundingClientRect();
+      const availableW = Math.max(160, rect.width - 12);
+      const availableH = Math.max(320, rect.height - 12);
+
+      // 计算方格单元尺寸以满足 10x20 纵横比
+      const byH = Math.floor(availableH / ROWS);
+      const byW = Math.floor(availableW / COLS);
+      blockSize = Math.min(byH, byW);
+
+      const dpr = window.devicePixelRatio || 1;
+      const displayW = blockSize * COLS;
+      const displayH = blockSize * ROWS;
+
+      canvas.width = displayW * dpr;
+      canvas.height = displayH * dpr;
+      canvas.style.width = displayW + 'px';
+      canvas.style.height = displayH + 'px';
+
+      ctx.resetTransform?.();
+      ctx.scale(dpr, dpr);
+
+      // 缩放下一个方块预览画布
+      nextCanvas.width = 80 * dpr;
+      nextCanvas.height = 80 * dpr;
+      nextCanvas.style.width = '80px';
+      nextCanvas.style.height = '80px';
+      nextCtx.resetTransform?.();
+      nextCtx.scale(dpr, dpr);
+
+      draw();
+      drawNextPiece();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    // 矩阵碰撞检测
+    function checkCollision(piece, offX, offY) {
+      for (let r = 0; r < piece.matrix.length; r++) {
+        for (let c = 0; c < piece.matrix[r].length; c++) {
+          if (piece.matrix[r][c] !== 0) {
+            const newX = piece.x + c + offX;
+            const newY = piece.y + r + offY;
+
+            if (newX < 0 || newX >= COLS || newY >= ROWS) {
+              return true; // 越界
+            }
+            if (newY >= 0 && grid[newY][newX] !== 0) {
+              return true; // 与固定方块碰撞
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    // 旋转矩阵 (顺时针 90 度)
+    function rotateMatrix(matrix) {
+      const N = matrix.length;
+      const result = Array.from({ length: N }, () => Array(N).fill(0));
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          result[c][N - 1 - r] = matrix[r][c];
+        }
+      }
+      return result;
+    }
+
+    // 方块旋转并附带简易踢墙 (Wall Kick)
+    function rotateCurrentPiece() {
+      if (!currentPiece || isPaused || isGameOver) return;
+      const originalMatrix = currentPiece.matrix;
+      const rotated = rotateMatrix(originalMatrix);
+      const testOffsets = [0, -1, 1, -2, 2]; // 踢墙测试偏移
+
+      for (const off of testOffsets) {
+        if (!checkCollision({ ...currentPiece, matrix: rotated }, off, 0)) {
+          currentPiece.matrix = rotated;
+          currentPiece.x += off;
+          soundEngine.playRotate();
+          hapticEngine.tick();
+          draw();
+          return;
+        }
+      }
+    }
+
+    function spawnPiece() {
+      if (!nextPieceType) {
+        nextPieceType = bag.next();
+      }
+      const type = nextPieceType;
+      nextPieceType = bag.next();
+
+      const shapeData = SHAPES[type];
+      currentPiece = {
+        type: type,
+        matrix: shapeData.matrix.map(row => [...row]),
+        color: shapeData.color,
+        x: Math.floor((COLS - shapeData.matrix[0].length) / 2),
+        y: 0
+      };
+
+      // 出生点即碰撞则游戏结束
+      if (checkCollision(currentPiece, 0, 0)) {
+        triggerGameOver();
+      }
+
+      drawNextPiece();
+    }
+
+    // 计算虚影 (Ghost Piece) 最低落点
+    function getGhostY() {
+      if (!currentPiece) return 0;
+      let ghostY = currentPiece.y;
+      while (!checkCollision(currentPiece, 0, ghostY - currentPiece.y + 1)) {
+        ghostY++;
+      }
+      return ghostY;
+    }
+
+    function lockPiece() {
+      for (let r = 0; r < currentPiece.matrix.length; r++) {
+        for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+          if (currentPiece.matrix[r][c] !== 0) {
+            const gy = currentPiece.y + r;
+            const gx = currentPiece.x + c;
+            if (gy >= 0 && gy < ROWS) {
+              grid[gy][gx] = currentPiece.color;
+            }
+          }
+        }
+      }
+
+      soundEngine.playLock();
+      hapticEngine.thud();
+
+      clearLines();
+      spawnPiece();
+    }
+
+    function clearLines() {
+      let linesCleared = 0;
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (grid[r].every(cell => cell !== 0)) {
+          grid.splice(r, 1);
+          grid.unshift(Array(COLS).fill(0));
+          linesCleared++;
+          r++; // 再次检查当前下标
+        }
+      }
+
+      if (linesCleared > 0) {
+        lines += linesCleared;
+        // 计分规则：单行100，双行300，三行500，四连Tetris 800 * level
+        const pointMultipliers = [0, 100, 300, 500, 800];
+        const earned = (pointMultipliers[linesCleared] || 1000) * level;
+        score += earned;
+
+        // 每消除 10 行升级提速
+        level = Math.floor(lines / 10) + 1;
+        dropInterval = Math.max(120, 850 - (level - 1) * 75);
+
+        // 更新界面
+        scoreDisplay.textContent = score;
+        linesDisplay.textContent = lines;
+        levelDisplay.textContent = level;
+
+        // 音效与多行震感响应
+        if (linesCleared >= 4) {
+          soundEngine.playTetris();
+        } else {
+          soundEngine.playClear();
+        }
+        hapticEngine.lineClear(linesCleared);
+      }
+    }
+
+    function moveLeft() {
+      if (!currentPiece || isPaused || isGameOver) return;
+      if (!checkCollision(currentPiece, -1, 0)) {
+        currentPiece.x--;
+        soundEngine.playMove();
+        hapticEngine.tick();
+        draw();
+      }
+    }
+
+    function moveRight() {
+      if (!currentPiece || isPaused || isGameOver) return;
+      if (!checkCollision(currentPiece, 1, 0)) {
+        currentPiece.x++;
+        soundEngine.playMove();
+        hapticEngine.tick();
+        draw();
+      }
+    }
+
+    function softDrop() {
+      if (!currentPiece || isPaused || isGameOver) return;
+      if (!checkCollision(currentPiece, 0, 1)) {
+        currentPiece.y++;
+        score += 1; // 软降微量加分
+        scoreDisplay.textContent = score;
+        draw();
+      } else {
+        lockPiece();
+      }
+    }
+
+    function hardDrop() {
+      if (!currentPiece || isPaused || isGameOver) return;
+      let dropDistance = 0;
+      while (!checkCollision(currentPiece, 0, 1)) {
+        currentPiece.y++;
+        dropDistance++;
+      }
+      score += dropDistance * 2; // 硬降爽快加分
+      scoreDisplay.textContent = score;
+      draw();
+      lockPiece();
+    }
+
+    function drawBlock(context, x, y, size, color, isGhost = false) {
+      const px = x * size;
+      const py = y * size;
+
+      if (isGhost) {
+        // 虚影轮廓渲染
+        context.strokeStyle = color;
+        context.lineWidth = 1.5;
+        context.strokeRect(px + 1.5, py + 1.5, size - 3, size - 3);
+        context.fillStyle = color;
+        context.globalAlpha = 0.15;
+        context.fillRect(px + 1.5, py + 1.5, size - 3, size - 3);
+        context.globalAlpha = 1.0;
+        return;
+      }
+
+      // 方块本体 - 带立体高光与暗部渐变
+      context.fillStyle = color;
+      context.fillRect(px, py, size, size);
+
+      // 顶部与左侧白色亮边
+      context.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      context.fillRect(px, py, size, 2);
+      context.fillRect(px, py, 2, size);
+
+      // 底部与右侧黑色暗边
+      context.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      context.fillRect(px, py + size - 2, size, 2);
+      context.fillRect(px + size - 2, py, 2, size);
+
+      // 内芯微亮感
+      context.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      context.fillRect(px + 4, py + 4, size - 8, size - 8);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. 绘制网格背景线
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          ctx.strokeRect(c * blockSize, r * blockSize, blockSize, blockSize);
+        }
+      }
+
+      // 2. 绘制已固定方块
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (grid[r][c] !== 0) {
+            drawBlock(ctx, c, r, blockSize, grid[r][c]);
+          }
+        }
+      }
+
+      // 3. 绘制虚影 (Ghost Piece)
+      if (currentPiece && !isGameOver) {
+        const ghostY = getGhostY();
+        for (let r = 0; r < currentPiece.matrix.length; r++) {
+          for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+            if (currentPiece.matrix[r][c] !== 0) {
+              drawBlock(ctx, currentPiece.x + c, ghostY + r, blockSize, currentPiece.color, true);
+            }
+          }
+        }
+      }
+
+      // 4. 绘制当前下落中方块
+      if (currentPiece && !isGameOver) {
+        for (let r = 0; r < currentPiece.matrix.length; r++) {
+          for (let c = 0; c < currentPiece.matrix[r].length; c++) {
+            if (currentPiece.matrix[r][c] !== 0) {
+              drawBlock(ctx, currentPiece.x + c, currentPiece.y + r, blockSize, currentPiece.color);
+            }
+          }
+        }
+      }
+    }
+
+    // 绘制下一个方块预览
+    function drawNextPiece() {
+      nextCtx.clearRect(0, 0, 80, 80);
+      if (!nextPieceType) return;
+
+      const shape = SHAPES[nextPieceType];
+      const matrix = shape.matrix;
+      const previewBlockSize = 16;
+      const pieceW = matrix[0].length * previewBlockSize;
+      const pieceH = matrix.length * previewBlockSize;
+      const startX = Math.floor((80 - pieceW) / 2);
+      const startY = Math.floor((80 - pieceH) / 2);
+
+      for (let r = 0; r < matrix.length; r++) {
+        for (let c = 0; c < matrix[r].length; c++) {
+          if (matrix[r][c] !== 0) {
+            const px = startX + c * previewBlockSize;
+            const py = startY + r * previewBlockSize;
+            nextCtx.fillStyle = shape.color;
+            nextCtx.fillRect(px, py, previewBlockSize, previewBlockSize);
+            nextCtx.fillStyle = 'rgba(255,255,255,0.4)';
+            nextCtx.fillRect(px, py, previewBlockSize, 2);
+            nextCtx.fillRect(px, py, 2, previewBlockSize);
+          }
+        }
+      }
+    }
+
+    function gameLoop(timestamp) {
+      if (!isGameOver && !isPaused) {
+        if (!lastDropTime) lastDropTime = timestamp;
+        const progress = timestamp - lastDropTime;
+
+        if (progress > dropInterval) {
+          if (!checkCollision(currentPiece, 0, 1)) {
+            currentPiece.y++;
+          } else {
+            lockPiece();
+          }
+          lastDropTime = timestamp;
+          draw();
+        }
+      }
+      animFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function triggerGameOver() {
+      isGameOver = true;
+      soundEngine.playGameOver();
+      hapticEngine.gameOver();
+
+      let isNew = false;
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('tetris_high_score', highScore);
+        highScoreDisplay.textContent = highScore;
+        isNew = true;
+      }
+
+      finalScoreEl.textContent = score;
+      finalLinesEl.textContent = lines;
+      modalHighScoreEl.textContent = highScore;
+
+      if (isNew && score > 0) {
+        newRecordBadge.classList.remove('hidden');
+      } else {
+        newRecordBadge.classList.add('hidden');
+      }
+
+      gameOverModal.classList.remove('hidden');
+    }
+
+    function resetGame() {
+      grid = createGrid();
+      score = 0;
+      lines = 0;
+      level = 1;
+      dropInterval = 850;
+      isGameOver = false;
+      isPaused = false;
+      scoreDisplay.textContent = '0';
+      linesDisplay.textContent = '0';
+      levelDisplay.textContent = '1';
+      gameOverModal.classList.add('hidden');
+      pauseOverlay.classList.add('hidden');
+      updatePauseButtonUI();
+
+      spawnPiece();
+      draw();
+      lastDropTime = performance.now();
+    }
+
+    /* ========================================================================
+       5. 屏幕手势触控 (轻点旋转、滑动位移、下滑加速、上滑硬降)
+       ======================================================================== */
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchLastX = 0;
+    let touchLastY = 0;
+    let touchStartTime = 0;
+    let isTouchMoved = false;
+
+    boardContainer.addEventListener('touchstart', (e) => {
+      if (isGameOver || isPaused) return;
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchLastX = touch.clientX;
+      touchLastY = touch.clientY;
+      touchStartTime = Date.now();
+      isTouchMoved = false;
+    }, { passive: true });
+
+    boardContainer.addEventListener('touchmove', (e) => {
+      if (isGameOver || isPaused || !currentPiece) return;
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - touchLastX;
+      const deltaY = touch.clientY - touchLastY;
+
+      // 横向平移灵敏阈值（约每移动半个格子的距离触发一次）
+      const stepX = blockSize * 0.75;
+      if (Math.abs(deltaX) > stepX) {
+        if (deltaX > 0) {
+          moveRight();
+        } else {
+          moveLeft();
+        }
+        touchLastX = touch.clientX;
+        isTouchMoved = true;
+      }
+
+      // 向下滑动软下落
+      const stepY = blockSize * 0.9;
+      if (deltaY > stepY) {
+        softDrop();
+        touchLastY = touch.clientY;
+        isTouchMoved = true;
+      }
+    }, { passive: true });
+
+    boardContainer.addEventListener('touchend', (e) => {
+      if (isGameOver || isPaused) return;
+      const touchDuration = Date.now() - touchStartTime;
+      const changeX = touchLastX - touchStartX;
+      const changeY = touchLastY - touchStartY;
+
+      // 若没有长距离滑动，且轻按时间短，则判定为轻点 -> 旋转
+      if (!isTouchMoved && touchDuration < 250 && Math.hypot(changeX, changeY) < 15) {
+        rotateCurrentPiece();
+      }
+    }, { passive: true });
+
+    /* ========================================================================
+       6. 手机虚拟按键长按连续移动 (DAS)
+       ======================================================================== */
+    function setupContinuousButton(btnEl, action) {
+      let pressTimer = null;
+      let repeatTimer = null;
+
+      const start = (e) => {
+        if (e.cancelable) e.preventDefault();
+        action();
+        clearInterval(pressTimer);
+        clearInterval(repeatTimer);
+
+        // 长按延迟 160ms 后以 60ms 极速连发
+        pressTimer = setTimeout(() => {
+          repeatTimer = setInterval(() => {
+            action();
+          }, 60);
+        }, 160);
+      };
+
+      const stop = () => {
+        clearTimeout(pressTimer);
+        clearInterval(repeatTimer);
+      };
+
+      btnEl.addEventListener('touchstart', start, { passive: false });
+      btnEl.addEventListener('touchend', stop);
+      btnEl.addEventListener('touchcancel', stop);
+      btnEl.addEventListener('mousedown', start);
+      btnEl.addEventListener('mouseup', stop);
+      btnEl.addEventListener('mouseleave', stop);
+    }
+
+    setupContinuousButton(document.getElementById('ctrlLeft'), moveLeft);
+    setupContinuousButton(document.getElementById('ctrlRight'), moveRight);
+    setupContinuousButton(document.getElementById('ctrlDown'), softDrop);
+
+    // 旋转与硬降单次触发更适合防误触
+    document.getElementById('ctrlRotate').addEventListener('click', (e) => {
+      rotateCurrentPiece();
+    });
+    document.getElementById('ctrlHardDrop').addEventListener('click', (e) => {
+      hardDrop();
+    });
+
+    /* ========================================================================
+       7. 顶部工具栏切换与键盘兼容
+       ======================================================================== */
+    const btnSound = document.getElementById('btnSound');
+    const iconSoundOn = document.getElementById('iconSoundOn');
+    const iconSoundOff = document.getElementById('iconSoundOff');
+    btnSound.addEventListener('click', () => {
+      soundEngine.enabled = !soundEngine.enabled;
+      if (soundEngine.enabled) {
+        soundEngine.initCtx();
+        iconSoundOn.classList.remove('hidden');
+        iconSoundOff.classList.add('hidden');
+      } else {
+        iconSoundOn.classList.add('hidden');
+        iconSoundOff.classList.remove('hidden');
+      }
+    });
+
+    const btnHaptic = document.getElementById('btnHaptic');
+    const iconVibrate = document.getElementById('iconVibrate');
+    btnHaptic.addEventListener('click', () => {
+      hapticEngine.enabled = !hapticEngine.enabled;
+      if (hapticEngine.enabled) {
+        hapticEngine.tick();
+        btnHaptic.classList.remove('opacity-40');
+      } else {
+        btnHaptic.classList.add('opacity-40');
+      }
+    });
+
+    const btnPause = document.getElementById('btnPause');
+    const btnResume = document.getElementById('btnResume');
+    const iconPause = document.getElementById('iconPause');
+    const iconPlay = document.getElementById('iconPlay');
+
+    function togglePause() {
+      if (isGameOver) return;
+      isPaused = !isPaused;
+      updatePauseButtonUI();
+    }
+
+    function updatePauseButtonUI() {
+      if (isPaused) {
+        pauseOverlay.classList.remove('hidden');
+        iconPause.classList.add('hidden');
+        iconPlay.classList.remove('hidden');
+      } else {
+        pauseOverlay.classList.add('hidden');
+        iconPause.classList.remove('hidden');
+        iconPlay.classList.add('hidden');
+        lastDropTime = performance.now();
+      }
+    }
+
+    btnPause.addEventListener('click', togglePause);
+    btnResume.addEventListener('click', togglePause);
+    document.getElementById('btnRestart').addEventListener('click', resetGame);
+
+    // 键盘支持 (适配电脑调试与 iPad 实体键盘)
+    window.addEventListener('keydown', (e) => {
+      if (isGameOver) return;
+      switch (e.code) {
+        case 'ArrowLeft':
+        case 'KeyA':
+          moveLeft();
+          break;
+        case 'ArrowRight':
+        case 'KeyD':
+          moveRight();
+          break;
+        case 'ArrowDown':
+        case 'KeyS':
+          softDrop();
+          break;
+        case 'ArrowUp':
+        case 'KeyW':
+          rotateCurrentPiece();
+          break;
+        case 'Space':
+          e.preventDefault();
+          hardDrop();
+          break;
+        case 'KeyP':
+          togglePause();
+          break;
+      }
+    });
+
+    /* ========================================================================
+       8. PWA "添加到桌面" 弹窗指引
+       ======================================================================== */
+    const pwaModal = document.getElementById('pwaModal');
+    const btnPwa = document.getElementById('btnPwa');
+    const btnClosePwa = document.getElementById('btnClosePwa');
+    const btnPwaConfirm = document.getElementById('btnPwaConfirm');
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      btnPwa.classList.add('animate-pulse');
+    });
+
+    btnPwa.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        btnPwa.classList.remove('animate-pulse');
+      } else {
+        pwaModal.classList.remove('hidden');
+      }
+    });
+
+    btnClosePwa.addEventListener('click', () => pwaModal.classList.add('hidden'));
+    btnPwaConfirm.addEventListener('click', () => pwaModal.classList.add('hidden'));
+
+    // 初始化启动
+    window.onload = () => {
+      resizeCanvas();
+      resetGame();
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>
