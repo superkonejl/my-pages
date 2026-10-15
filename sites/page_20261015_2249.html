@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>坦克大战</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="坦克大战">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0f0b">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:none}
+html,body{margin:0;height:100%;background:#0b0f0b;overflow:hidden;font-family:system-ui,sans-serif}
+body{display:flex;align-items:center;justify-content:center}
+canvas{height:100%;max-width:100%;aspect-ratio:4/3;background:#000;image-rendering:pixelated}
+#pad,#fire{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.25)}
+#pad{left:calc(env(safe-area-inset-left,0px) + 24px);width:min(38vh,150px);height:min(38vh,150px)}
+#knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21%;border-radius:50%;background:rgba(255,255,255,.35)}
+#fire{right:calc(env(safe-area-inset-right,0px) + 28px);width:min(32vh,120px);height:min(32vh,120px);background:rgba(220,60,40,.35);border-color:rgba(255,120,100,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:700}
+#fire.on{background:rgba(255,90,60,.7)}
+#rot{display:none;position:fixed;inset:0;background:#0b0f0b;color:#fff;z-index:9;align-items:center;justify-content:center;text-align:center;font-size:20px;line-height:1.8}
+@media (orientation:portrait){#rot{display:flex}}
+</style></head><body>
+<canvas id="cv" width="512" height="384"></canvas>
+<div id="pad"><div id="knob"></div></div>
+<div id="fire">开火</div>
+<div id="rot">📱↻<br>请将手机横过来玩<br><small>添加到桌面后会自动全屏</small></div>
+<script>
+// ---- 图标 & 添加到桌面 ----
+(function(){try{
+const c=document.createElement('canvas');c.width=c.height=192;const g=c.getContext('2d');
+let gr=g.createLinearGradient(0,0,192,192);gr.addColorStop(0,'#ff9f1c');gr.addColorStop(1,'#c1121f');
+g.fillStyle=gr;g.fillRect(0,0,192,192);
+g.fillStyle='#1b3a1b';g.fillRect(34,46,28,100);g.fillRect(130,46,28,100);
+g.fillStyle='#4caf50';g.fillRect(56,56,80,80);
+g.fillStyle='#2e7d32';g.beginPath();g.arc(96,96,26,0,7);g.fill();
+g.fillStyle='#e8f5e9';g.fillRect(89,14,14,70);
+g.fillStyle='#ffd60a';g.beginPath();g.arc(96,16,12,0,7);g.fill();
+const u=c.toDataURL('image/png');
+[['apple-touch-icon',u],['icon',u]].forEach(([r,h])=>{const l=document.createElement('link');l.rel=r;l.href=h;document.head.appendChild(l)});
+const m={name:'坦克大战',short_name:'坦克大战',display:'fullscreen',orientation:'landscape',background_color:'#0b0f0b',theme_color:'#0b0f0b',icons:[{src:u,sizes:'192x192',type:'image/png'}]};
+const l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/manifest+json'}));document.head.appendChild(l);
+}catch(e){}})();
+
+// ---- 游戏 ----
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const T=32,C=16,R=12,W=512,H=384,S=28;
+let map,P,E,B,level=1,score=0,lives=3,left,toSpawn,state='ready',spT=0,frame=0;
+const keys={};let jd=-1,fireHeld=false;
+
+function newMap(){
+ map=Array.from({length:R},()=>Array(C).fill(0));
+ for(let r=2;r<=9;r++)for(let c=0;c<8;c++){
+  const x=Math.random();let v=x<.2?1:x<.25?2:x<.29?3:0;
+  map[r][c]=v;map[r][C-1-c]=v;}
+ for(let r=10;r<R;r++)for(let c=0;c<C;c++)map[r][c]=0;
+ [[10,6],[10,7],[10,8],[11,6],[11,8]].forEach(([r,c])=>map[r][c]=1);
+ map[11][7]=5;
+}
+function mk(x,y,team,o){return Object.assign({x,y,dir:team?0:2,team,cd:0,hp:1,sp:1,t:0,sh:0},o)}
+function startLevel(){
+ newMap();E=[];B=[];toSpawn=Math.min(10+level*3,24);left=toSpawn;
+ P=mk(5*T+2,11*T+2,1,{sp:2,sh:150,color:'#e6c229',tc:'#fff3a0',tread:'#7a6410'});
+ spT=0;state='play';
+}
+function reset(){level=1;score=0;lives=3;startLevel()}
+function blocked(t,x,y){
+ if(x<0||y<0||x+S>W||y+S>H)return true;
+ for(let r=Math.floor(y/T);r<=Math.floor((y+S-1)/T);r++)for(let c=Math.floor(x/T);c<=Math.floor((x+S-1)/T);c++){const v=map[r][c];if(v===1||v===2||v===3||v===5)return true}
+ const all=[P,...E];
+ for(const o of all)if(o&&o!==t&&o.hp>0&&Math.abs(o.x-x)<S&&Math.abs(o.y-y)<S)return true;
+ return false;
+}
+const DX=[0,1,0,-1],DY=[-1,0,1,0];
+function mv(t,d){t.dir=d;const nx=t.x+DX[d]*t.sp,ny=t.y+DY[d]*t.sp;if(!blocked(t,nx,ny)){t.x=nx;t.y=ny;return true}return false}
+function shoot(t){if(t.cd>0)return;t.cd=t.team?20:70;
+ B.push({x:t.x+14+DX[t.dir]*17,y:t.y+14+DY[t.dir]*17,d:t.dir,team:t.team,sp:t.team?6:4})}
+function spawnEnemy(){
+ const cols=[0,7,15].sort(()=>Math.random()-.5);
+ for(const c of cols){const x=c*T+2,y=2;
+  if(![P,...E].some(o=>o&&o.hp>0&&Math.abs(o.x-x)<S+4&&Math.abs(o.y-y)<S+4)){
+   const k=Math.random(),lv=level;
+   let o;
+   if(k<.15+lv*.04)o={color:'#c0c0c0',tc:'#fff',tread:'#555',hp:3,sp:1};
+   else if(k<.4+lv*.04)o={color:'#e0605a',tc:'#ffb4ae',tread:'#6a1f1a',sp:1.6};
+   else o={color:'#8ab4f8',tc:'#d2e3fc',tread:'#35507a',sp:1};
+   E.push(mk(x,y,0,o));toSpawn--;return}}
+}
+function update(){
+ frame++;
+ if(state!=='play')return;
+ if(P.hp>0){
+  P.cd>0&&P.cd--;P.sh>0&&P.sh--;
+  let d=jd;
+  if(d<0){if(keys.ArrowUp||keys.w)d=0;else if(keys.ArrowRight||keys.d)d=1;else if(keys.ArrowDown||keys.s)d=2;else if(keys.ArrowLeft||keys.a)d=3}
+  if(d>=0)mv(P,d);
+  if(fireHeld||keys[' '])shoot(P);
+ }
+ if(toSpawn>0&&E.length<4&&--spT<=0){spawnEnemy();spT=120}
+ for(const e of E){
+  e.cd>0&&e.cd--;
+  if(--e.t<=0){e.t=40+Math.random()*80;e.dir=Math.random()<.4?2:Math.floor(Math.random()*4)}
+  if(!mv(e,e.dir))e.t=0;
+  if(Math.random()<.015)shoot(e);
+ }
+ for(const b of B){
+  b.x+=DX[b.d]*b.sp;b.y+=DY[b.d]*b.sp;
+  if(b.x<0||b.y<0||b.x>W||b.y>H){b.dead=1;continue}
+  const c=Math.floor(b.x/T),r=Math.floor(b.y/T),v=map[r]&&map[r][c];
+  if(v===1){map[r][c]=0;b.dead=1;continue}
+  if(v===2){b.dead=1;continue}
+  if(v===5){map[r][c]=6;b.dead=1;state='over';continue}
+  const hit=o=>o.hp>0&&b.x>o.x&&b.x<o.x+S&&b.y>o.y&&b.y<o.y+S;
+  if(b.team){for(const e of E)if(hit(e)){b.dead=1;if(--e.hp<=0){score+=100;left--}break}}
+  else if(hit(P)){b.dead=1;if(P.sh<=0){P.hp=0;lives--;
+    if(lives>0){P=mk(5*T+2,11*T+2,1,{sp:2,sh:150,color:'#e6c229',tc:'#fff3a0',tread:'#7a6410'})}else state='over'}}
+ }
+ B=B.filter(b=>!b.dead);E=E.filter(e=>e.hp>0);
+ if(state==='play'&&left<=0){state='win'}
+}
+function drawTank(t){
+ ctx.save();ctx.translate(t.x+14,t.y+14);ctx.rotate(t.dir*Math.PI/2);
+ ctx.fillStyle=t.tread;ctx.fillRect(-14,-14,6,28);ctx.fillRect(8,-14,6,28);
+ ctx.fillStyle=t.color;ctx.fillRect(-8,-11,16,22);
+ ctx.fillStyle=t.tc;ctx.fillRect(-5,-5,10,10);ctx.fillRect(-2,-16,4,12);
+ ctx.restore();
+ if(t.sh>0&&frame%8<5){ctx.strokeStyle='#7df';ctx.lineWidth=2;ctx.beginPath();ctx.arc(t.x+14,t.y+14,19,0,7);ctx.stroke()}
+}
+function txt(s,y,sz,col){ctx.fillStyle=col||'#fff';ctx.font='bold '+sz+'px system-ui,sans-serif';ctx.textAlign='center';ctx.fillText(s,W/2,y)}
+function draw(){
+ ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+ if(!map){txt('坦克大战',150,48,'#ffd60a');txt('点击屏幕开始',210,22);txt('左侧摇杆移动 · 右侧按钮开火',250,15,'#aaa');txt('保护好底部的基地！',280,15,'#aaa');return}
+ for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+  const v=map[r][c],x=c*T,y=r*T;if(!v)continue;
+  if(v===1){ctx.fillStyle='#b5481f';ctx.fillRect(x,y,T,T);ctx.fillStyle='#6b2a10';for(let i=0;i<4;i++){ctx.fillRect(x,y+i*8+7,T,1);ctx.fillRect(x+(i%2?8:20),y+i*8,1,8)}}
+  else if(v===2){ctx.fillStyle='#9aa5ad';ctx.fillRect(x,y,T,T);ctx.fillStyle='#d6dde2';ctx.fillRect(x+4,y+4,T-8,T-8);ctx.fillStyle='#9aa5ad';ctx.fillRect(x+9,y+9,T-18,T-18)}
+  else if(v===3){ctx.fillStyle='#1e5fd8';ctx.fillRect(x,y,T,T);ctx.fillStyle='#6aa0ff';ctx.fillRect(x+4,y+8,10,2);ctx.fillRect(x+16,y+20,10,2)}
+  else{ctx.fillStyle=v===5?'#ffd60a':'#555';ctx.fillRect(x+4,y+4,24,24);ctx.fillStyle='#000';ctx.fillRect(x+12,y+10,8,12)}
+ }
+ ctx.fillStyle='#fff';for(const b of B)ctx.fillRect(b.x-3,b.y-3,6,6);
+ E.forEach(drawTank);P.hp>0&&drawTank(P);
+ ctx.globalAlpha=.8;ctx.font='bold 13px system-ui,sans-serif';ctx.textAlign='left';ctx.fillStyle='#fff';
+ ctx.fillText('第'+level+'关  ❤'+lives+'  敌人 '+left+'  得分 '+score,8,H-6);ctx.globalAlpha=1;
+ if(state==='over'){ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(0,0,W,H);txt('游戏结束',170,44,'#ff6b5e');txt('得分 '+score,205,20);txt('点击屏幕重新开始',245,18,'#ccc')}
+ if(state==='win'){ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(0,0,W,H);txt('过关！',170,44,'#7be07b');txt('得分 '+score,205,20);txt('点击屏幕进入下一关',245,18,'#ccc')}
+}
+let last=0,acc=0;
+function loop(t){acc+=Math.min(t-last,100);last=t;while(acc>=16.67){update();acc-=16.67}draw();requestAnimationFrame(loop)}
+requestAnimationFrame(t=>{last=t;loop(t)});
+
+function act(){
+ if(state==='ready'||state==='over'){if(!map||state==='over')reset();else startLevel()}
+ else if(state==='win'){level++;startLevel()}
+}
+cv.addEventListener('pointerdown',act);
+addEventListener('keydown',e=>{keys[e.key]=1;if(e.key===' '||e.key==='Enter')act()});
+addEventListener('keyup',e=>keys[e.key]=0);
+
+// ---- 触控 ----
+const pad=document.getElementById('pad'),knob=document.getElementById('knob'),fb=document.getElementById('fire');
+let jid=null;
+function joy(e){
+ const r=pad.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),m=Math.hypot(dx,dy),k=Math.min(m,r.width/2.6)/(m||1);
+ knob.style.transform=`translate(${dx*k}px,${dy*k}px)`;
+ jd=m<r.width*.12?-1:Math.abs(dx)>Math.abs(dy)?(dx>0?1:3):(dy>0?2:0);
+}
+function joyEnd(){jid=null;jd=-1;knob.style.transform=''}
+pad.addEventListener('pointerdown',e=>{act();jid=e.pointerId;pad.setPointerCapture(jid);joy(e)});
+pad.addEventListener('pointermove',e=>{if(e.pointerId===jid)joy(e)});
+pad.addEventListener('pointerup',joyEnd);pad.addEventListener('pointercancel',joyEnd);
+fb.addEventListener('pointerdown',e=>{act();fb.setPointerCapture(e.pointerId);fireHeld=true;fb.classList.add('on')});
+const fe=()=>{fireHeld=false;fb.classList.remove('on')};
+fb.addEventListener('pointerup',fe);fb.addEventListener('pointercancel',fe);
+document.addEventListener('contextmenu',e=>e.preventDefault());
+</script></body></html>
